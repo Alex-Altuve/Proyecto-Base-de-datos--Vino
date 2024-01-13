@@ -1,0 +1,2252 @@
+/*creates y secuencia de cada tabla*/
+CREATE  SEQUENCE Sec_id_PaisProduc
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Pais_Productor
+(
+    idPaisProduc INT NOT NULL DEFAULT NEXTVAL('Sec_id_PaisProduc') ,
+    Nombre   VARCHAR(50) NOT NULL UNIQUE,
+    Continente  CHAR(5)  NOT NULL,
+    Descripcion_general   VARCHAR NOT NULL,
+    Superficie_viñedo_en_hectarea NUMERIC NOT NULL,
+    Moneda CHAR(20)  NOT NULL,
+    Constraint chk_Continente CHECK (Continente in ('Am', 'Af', 'As', 'Eu', 'Oc')),
+    Constraint chk_Moneda CHECK (Moneda in ('Euro', 'Dolar Americano')),
+     CONSTRAINT PK_PaisProduc PRIMARY KEY (idPaisProduc)
+);
+
+CREATE  SEQUENCE Sec_id_RegionVinicola
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE RegionVinicola_DO(
+    idRegion INT NOT NULL DEFAULT NEXTVAL('Sec_id_RegionVinicola') ,
+    idPaisProduc INT NOT NULL,
+    Nombre VARCHAR(50) NOT NULL,
+    Descripcion VARCHAR NOT NULL,
+    Constraint FK_Region_PaisProduc FOREIGN KEY (idPaisProduc) REFERENCES Pais_Productor(idPaisProduc),
+    Constraint PK_RegionVinicola PRIMARY KEY (idRegion,idPaisProduc)
+);
+
+CREATE  SEQUENCE Sec_id_Bodega
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Bodega(
+    idBodega INT NOT NULL DEFAULT nextval('Sec_id_Bodega') UNIQUE,
+    idRegion INT NOT NULL,
+    idPaisProduc INT NOT NULL,
+    Fecha_fundacion DATE NOT NULL,
+    Resumen_empresa VARCHAR NOT NULL,
+    Direccion VARCHAR(200) NOT NULL ,
+    Pagina_web VARCHAR(200) NOT NULL,
+    Nombre VARCHAR(50) NOT NULL,
+    Constraint FK_Bodega_Region FOREIGN KEY (idRegion, idPaisProduc) REFERENCES regionvinicola_do(idRegion,idPaisProduc),
+    Constraint PK_Bodega PRIMARY KEY (idRegion,idPaisProduc, idBodega)
+);
+
+CREATE  SEQUENCE Sec_id_ClasificacionEstilos
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Clasificacion_Estilos(
+    idClasificacion INT NOT NULL DEFAULT nextval('Sec_id_ClasificacionEstilos'),
+    Nombre VARCHAR(50) NOT NULL,
+    Nivel int NOT NULL,
+    Descripcion VARCHAR NOT NULL,
+    IdPadreClasificacion INT,
+
+    constraint chk_Nivel check(Nivel in (1,2,3)),
+    Constraint FK_RecursivaClasificacionE FOREIGN KEY (idPadreClasificacion) REFERENCES Clasificacion_Estilos(idClasificacion),
+    Constraint PK_ClasificacionEstilos PRIMARY KEY (idClasificacion)
+);
+
+CREATE  SEQUENCE Sec_id_VinoMarca
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Vino_Marca(
+    idVino INT NOT NULL DEFAULT nextval('Sec_id_VinoMarca'),
+    idBodega INT NOT NULL,
+    idRegion INT NOT NULL,
+    IdPaisProduc INT NOT NULL,
+
+    Nombre VARCHAR(100) NOT NULL,
+    Grado_alcohol NUMERIC NOT NULL,
+    Descripcion VARCHAR NOT NULL,
+    Maridaje VARCHAR NOT NULL,
+    Cata_descripcion VARCHAR NOT NULL,
+    Temperatura_en_C NUMERIC NOT NULL,
+    Ph NUMERIC NOT NULL ,
+    Acidez NUMERIC NOT NULL ,
+    Tiempo_maduracion_en_meses NUMERIC NOT NULL ,
+    Promedio_años_consumo NUMERIC NOT NULL ,
+    idClasificacion INT NOT NULL,
+
+    Constraint chk_GradoAlcohol check (Grado_alcohol between 4 and 23),
+    Constraint chk_PH check ( Ph between 0 and 14),
+    Constraint FK_Vino_Bodega FOREIGN KEY (idBodega, idRegion, IdPaisProduc) REFERENCES bodega(idBodega,idRegion,IdPaisProduc),
+    Constraint FK_Vino_Clasificacion FOREIGN KEY (idClasificacion) REFERENCES clasificacion_estilos(idClasificacion),
+    Constraint PK_VinoMarca PRIMARY KEY (idVino,idBodega,idRegion,IdPaisProduc)
+);
+
+CREATE TABLE Produccion_Anual_Vino(
+    Año DATE NOT NULL,
+    idVino INT NOT NULL,
+    idBodega INT NOT NULL ,
+    idRegion INT NOT NULL ,
+    idPaisProduc INT NOT NULL ,
+    Total_botellas NUMERIC NOT NULL ,
+    Total_dest_exp_hect NUMERIC NOT NULL ,
+    Clasificación_añadas CHAR(5) NOT NULL,
+    Constraint chk_ClasificacionAñada check ( Clasificación_añadas in ('E','MB','B','R','D') ),
+    Constraint FK_Produccion_VinoMarca FOREIGN KEY (idVino,idBodega,idRegion,idPaisProduc) REFERENCES vino_marca(idVino,idBodega,idRegion,idPaisProduc),
+    Constraint PK_ProduccionAnualVino PRIMARY KEY (Año,idVino,idBodega,idRegion,idPaisProduc)
+);
+
+CREATE SEQUENCE Sec_id_CalificacionAño
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Calificacion_Año(
+    idCalificacionAño INT NOT NULL DEFAULT nextval('Sec_id_CalificacionAño'),
+    Año DATE NOT NULL,
+    idVino INT NOT NULL,
+    idBodega INT NOT NULL,
+    idRegion INT NOT NULL,
+    idPaisProduc INT NOT NULL,
+    Valor NUMERIC NOT NULL,
+    Critico VARCHAR(300) NOT NULL,
+    Constraint FK_Calificacion_ProduccionAnualVino FOREIGN KEY (Año,idVino,idBodega,idRegion,idPaisProduc) REFERENCES produccion_anual_vino(Año,idVino,idBodega,idRegion,idPaisProduc),
+    Constraint PK_CalificacionAño PRIMARY KEY (idCalificacionAño,Año, idVino,idBodega,idRegion,idPaisProduc)
+);
+
+CREATE SEQUENCE Sec_id_VariedadUva
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Variedad_Uva(
+    idVariedad INT NOT NULL DEFAULT nextval('Sec_id_VariedadUva'),
+    Nombre_variedad VARCHAR(50) NOT NULL UNIQUE ,
+    Tipo_Uva VARCHAR(15) NOT NULL,
+
+    Constraint PK_VariedadUva PRIMARY KEY (idVariedad),
+    Constraint chk_TipoUva check (Tipo_Uva in ('Uva Tinta','Uva Blanca'))
+);
+
+CREATE TABLE Var_Vino(
+    idVino INT NOT NULL,
+    idBodega INT NOT NULL,
+    idRegion INT NOT NULL,
+    idPaisProduc INT NOT NULL,
+    idVariedad INT NOT NULL,
+    Constraint FK_VarVino_Vino FOREIGN KEY (idVino,idBodega,idRegion,idPaisProduc) REFERENCES vino_marca(idVino,idBodega,idRegion,idPaisProduc),
+    Constraint FK_VarVino_VariedadUva FOREIGN KEY (idVariedad) REFERENCES variedad_uva(idVariedad),
+    Constraint PK_VarVino PRIMARY KEY (idVariedad,idVino,idBodega,idRegion,idPaisProduc)
+);
+
+CREATE TABLE DOC(
+    idRegion INT NOT NULL ,
+    idPaisProduc INT NOT NULL ,
+    idVariedad INT NOT NULL ,
+    Nombre VARCHAR(50) NOT NULL ,
+    Descripcion VARCHAR NOT NULL,
+    Constraint FK_Doc_Region FOREIGN KEY (idRegion,idPaisProduc) REFERENCES regionvinicola_do(idRegion,idPaisProduc),
+    Constraint FK_Doc_VariedadUva FOREIGN KEY (idVariedad) REFERENCES variedad_uva(idVariedad),
+    Constraint PK_DOC PRIMARY KEY (idRegion,idPaisProduc,idVariedad)
+);
+
+CREATE SEQUENCE Sec_id_Presentacion
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Presentacion(
+    idVino INT NOT NULL ,
+    idBodega  INT NOT NULL,
+    idRegion  INT NOT NULL,
+    idPaisProduc  INT NOT NULL,
+    idPresentacion  INT NOT NULL DEFAULT nextval('Sec_id_Presentacion'),
+    Tipo CHAR(10) NOT NULL,
+    Cantidad_caja NUMERIC,
+    Descripcion VARCHAR,
+
+    Constraint chk_Tipo check ( Tipo in ('Botella','Caja') ),
+    Constraint FK_Presentacion_Vino FOREIGN KEY (idVino,idBodega,idRegion,idPaisProduc) REFERENCES vino_marca(idVino,idBodega,idRegion,idPaisProduc),
+    Constraint PK_Presentacion PRIMARY KEY (idVino,idBodega,idRegion,idPaisProduc,idPresentacion)
+);
+
+CREATE TABLE Historico_Precio(
+    idVino INT NOT NULL ,
+    idBodega INT NOT NULL,
+    idRegion INT NOT NULL,
+    idPaisProduc INT NOT NULL,
+    idPresentacion INT NOT NULL,
+    Año DATE NOT NULL,
+    Precio NUMERIC NOT NULL,
+
+    Constraint FK_Presentacion_HistoricoP FOREIGN KEY (idVino,idBodega,idRegion,idPaisProduc, idPresentacion) REFERENCES presentacion (idVino,idBodega,idRegion,idPaisProduc, idPresentacion),
+    Constraint PK_HistoricoPrecio PRIMARY KEY (idVino,idBodega,idRegion,idPaisProduc, idPresentacion, Año)
+);
+
+CREATE SEQUENCE Sec_id_PaisImportador
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Pais_Importador(
+    idPaisImp INT NOT NULL DEFAULT nextval('Sec_id_PaisImportador'),
+    Nombre VARCHAR(50) NOT NULL UNIQUE,
+    Continente  CHAR(5)  NOT NULL
+
+    Constraint chk_Continente CHECK (Continente in ('Am', 'Af', 'As', 'Eu', 'Oc')),
+    Constraint PK_PaisImportador PRIMARY KEY (idPaisImp)
+);
+
+
+CREATE TABLE Exp_Pais_Año(
+    idBodega INT NOT NULL,
+    idRegion  INT NOT NULL,
+    idPaisProduc  INT NOT NULL,
+    idPaisImp  INT NOT NULL,
+    Año DATE NOT NULL,
+    Volumen_en_hect_importado NUMERIC NOT NULL,
+    Constraint FK_ExpPaisAño_Bodega FOREIGN KEY (idBodega,idRegion,idPaisProduc) REFERENCES bodega(idBodega,idRegion,idPaisProduc),
+    Constraint FK_ExpPaisAño_PaisImp FOREIGN KEY (idPaisImp) REFERENCES pais_importador(idPaisImp),
+    Constraint PK_ExpPaisAño PRIMARY KEY (idBodega,idRegion,idPaisProduc, idPaisImp, Año)
+
+);
+
+
+CREATE SEQUENCE Sec_id_Organizacion
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+create table Organizacion(
+    idPaisProduc int not null,
+    idOrganizacion int not null default nextval('Sec_id_Organizacion'),
+    Nombre varchar(100) not null unique,
+    Descripcion varchar not null,
+    constraint fk_organizacion foreign key (idPaisProduc) references pais_productor(idpaisproduc),
+    constraint pk_organizacion primary key (idPaisProduc,idOrganizacion)
+);
+
+CREATE SEQUENCE Sec_id_Concurso
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+create table Concurso(
+    idConcurso int not null default nextval('Sec_id_Concurso'),
+    Nombre varchar(100) not null ,
+    Tipo_Concurso char (20) not null ,
+    Tipo_Cata char(20) not null ,
+    Alcance char(20) not null ,
+    Caracteristicas_generales varchar not null ,
+    constraint pk_concurso primary key (idConcurso),
+    constraint chk_tipo_concurso check ( Tipo_Concurso in('Catador','Vino') ),
+    constraint chk_tipo_cata check ( Tipo_Cata in('A ciegas', 'Varietal', 'Horizontal',
+'Vertical', 'Varietal/Vertical') ),
+    constraint chk_alcance check ( Alcance in('Nacional',
+'Internacional') )
+
+);
+
+create table  Organizadores(
+    idConcurso int not null,
+    idPaisProduc int not null ,
+    idOrganizacion int not null,
+    constraint pk_organizadores primary key (idOrganizacion,idConcurso,idPaisProduc),
+    constraint fk2_organizadores foreign key (idPaisProduc,idOrganizacion) references organizacion(idPaisproduc,idOrganizacion),
+    constraint fk1_organizadores foreign key (idConcurso) references concurso(idConcurso)
+);
+create table Juez (
+    Documento_identidad numeric not null ,
+    Primer_nombre varchar(50) not null ,
+    Primer_apellido varchar(50) not null,
+    Especialidad_resumen varchar not null,
+    Fecha_nacimiento date not null ,
+    Segundo_nombre varchar(50),
+    Segundo_apellido varchar(50),
+    constraint pk_Juez primary key (Documento_identidad)
+);
+
+CREATE SEQUENCE Sec_id_Premio
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+create table Premio(
+    idConcurso int not null ,
+    idPremio int not null default nextval('Sec_id_Premio'),
+    Nombre varchar(50) not null ,
+    Descripcion varchar not null ,
+    Tipo char(20) not null ,
+    Posicion int not null ,
+    Cantidad_dinero numeric,
+    constraint chk_Tipo check ( Tipo in ('Medalla','Certificado','Efectivo','Otros') ),
+    constraint fk_premio foreign key (idConcurso) references concurso(idconcurso),
+    constraint pk_premio primary key (idConcurso,idPremio)
+
+);
+
+
+
+create table Competidor_Catador(
+    Documento_identidad numeric not null ,
+    Primer_nombre varchar(50) not null ,
+    Primer_apellido varchar(50) not null,
+    Fecha_nacimiento date not null ,
+    Segundo_nombre varchar(50),
+    Segundo_apellido varchar(50),
+    constraint pk_Competidor_Catador primary key (Documento_identidad)
+);
+
+
+CREATE  SEQUENCE Sec_id_CalendarioConcurso
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Calendario_Concurso(
+    idConcurso INT NOT NULL,
+    idCalendario INT NOT NULL DEFAULT NEXTVAL('Sec_id_CalendarioConcurso') ,
+    Fecha_inicio DATE NOT NULL ,
+    Fecha_fin DATE NOT NULL ,
+    Fecha_limite_inscripcion DATE NOT NULL ,
+    Costo_inscripcion NUMERIC NOT NULL ,
+    Fecha_lim_envio_muestra DATE,
+
+    Constraint FK_Calendario_Concurso FOREIGN KEY (idConcurso) REFERENCES Concurso(idConcurso),
+    Constraint PK_Calendario_Concurso PRIMARY KEY (idConcurso,idCalendario)
+);
+
+CREATE TABLE J_C(
+    idCalendario INT NOT NULL,
+    idConcurso INT NOT NULL,
+    Documento_identidad NUMERIC NOT NULL,
+
+    Constraint FK_JC_Concurso FOREIGN KEY (idCalendario,idConcurso) REFERENCES Calendario_Concurso(idCalendario,idConcurso),
+    Constraint FK_JC_Juez FOREIGN KEY (Documento_identidad) REFERENCES Juez(Documento_identidad),
+    Constraint PK_J_C PRIMARY KEY (idCalendario,idConcurso,Documento_identidad)
+);
+
+CREATE  SEQUENCE Sec_id_CostoMuestraVino
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Costo_MuestraVino(
+    idCalendario INT NOT NULL,
+    idConcurso INT NOT NULL,
+    idMuestraVino INT NOT NULL DEFAULT NEXTVAL ('Sec_id_CostoMuestraVino'),
+    Numero_muestras NUMERIC NOT NULL,
+    Costo  NUMERIC NOT NULL,
+
+    Constraint FK_Calendario_CostoMuestra FOREIGN KEY (idCalendario,idConcurso) REFERENCES Calendario_Concurso(idCalendario,idConcurso),
+    Constraint PK_Costo_MuestraVino PRIMARY KEY (idCalendario,idConcurso,idMuestraVino)
+);
+
+CREATE  SEQUENCE Sec_id_Inscripcion
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Inscripcion(
+    idCalendario INT NOT NULL,
+    idConcurso INT NOT NULL,
+    idInscripcion INT NOT NULL default nextval('Sec_id_Inscripcion'),
+    Fecha_inscripcion DATE NOT NULL,
+    idBodega INT,
+    idRegion INT,
+    idPaisProduc INT,
+    Documento_identidad NUMERIC,
+    Premio_catador VARCHAR(200),
+
+     Constraint FK_CalendarioConcurso_Inscripcion FOREIGN KEY(idConcurso,idCalendario) REFERENCES Calendario_Concurso(idConcurso,idCalendario),
+     Constraint FK_Bodega_Inscripcion FOREIGN KEY (idBodega,idRegion,IdPaisProduc) REFERENCES Bodega(idBodega,idRegion,IdPaisProduc),
+     Constraint FK_CompetidorCatador_Inscripcion FOREIGN KEY (Documento_identidad) REFERENCES Competidor_Catador(Documento_identidad),
+     Constraint PK_Inscripcion PRIMARY KEY (idCalendario,idConcurso,idInscripcion)
+
+
+);
+
+CREATE  SEQUENCE Sec_id_MuestraCompite
+    start with 1
+	increment by 1
+	maxvalue  99999
+	minvalue	1;
+
+CREATE TABLE Muestra_Compite(
+    idInscripcion INT NOT NULL,
+    idCalendario INT NOT NULL,
+    idConcurso INT NOT NULL,
+    idMuestra INT NOT NULL default nextval('Sec_id_MuestraCompite'),
+    Año_añada DATE NOT NULL,
+    idVino INT NOT NULL,
+    idBodega INT NOT NULL,
+    idRegion INT NOT NULL,
+    idPaisProduc INT NOT NULL,
+    Premio int ,
+
+    Constraint FK_VinoMarca_MuestraCompite FOREIGN KEY (idVino,idBodega,idRegion,idPaisProduc) REFERENCES Vino_Marca(idVino,idBodega,idRegion ,idPaisProduc),
+    Constraint FK_Inscripcion_MuestraVino FOREIGN KEY (idInscripcion,idCalendario,idConcurso) REFERENCES Inscripcion(idInscripcion,idCalendario,idConcurso),
+    Constraint PK_MuestraCompite PRIMARY KEY (idInscripcion,idCalendario,idConcurso,idMuestra),
+    constraint check_Premio check (Premio in (1,2,3))
+);
+
+CREATE TABLE Telefono(
+    CodigoInt NUMERIC(5) NOT NULL,
+	CodArea NUMERIC(4) NOT NULL,
+	Numero NUMERIC(15) NOT NULL UNIQUE,
+    DiCatador INT,
+    DiJuez  INT,
+    idOrganizacion  INT,
+    idPaisProducOrg  INT,
+    idBodega  INT,
+    idRegion  INT,
+    idPaisProducBog  INT,
+
+    Constraint FK_Juez_Telefono FOREIGN KEY (DiJuez) REFERENCES Juez(documento_identidad),
+    Constraint FK_CompetidorCatador_Telefono FOREIGN KEY (DiCatador) REFERENCES Competidor_Catador(documento_identidad),
+    Constraint FK_Organizacion_Telefono FOREIGN KEY (idOrganizacion,idPaisProducOrg) REFERENCES Organizacion(idOrganizacion,idpaisproduc),
+    Constraint FK_Bodega_Telefono FOREIGN KEY (idRegion,idPaisProducBog, idBodega) REFERENCES Bodega(idRegion,idPaisProduc, idBodega),
+    Constraint PK_Telefono PRIMARY KEY (CodigoInt,CodArea,Numero)
+
+);
+
+/*TRIGERS Y PROGRAMAS ALMACENADOS*/
+/*EL nombre debe tener el formato Vitis Vinifera + Nombre*/
+CREATE FUNCTION validar_nombre_variedad_uva() RETURNS TRIGGER AS $$
+BEGIN
+  IF new.nombre_variedad !~ '^Vitis Vinifera .*[^ ]$' THEN
+    RAISE EXCEPTION 'El formato del nombre no es válido. Debe comenzar con "Vitis Vinifera" seguido de una o más palabras y no debe terminar con un espacio.';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_nombre_variedad_uva
+BEFORE INSERT OR UPDATE ON variedad_uva
+FOR EACH ROW EXECUTE PROCEDURE validar_nombre_variedad_uva();
+
+CREATE FUNCTION validar_edad_Juez_Catador() RETURNS TRIGGER AS $$
+DECLARE
+  edad INTEGER;
+BEGIN
+  edad:=EXTRACT(YEAR FROM age(current_date, new.Fecha_nacimiento));
+  IF edad < 21 THEN
+    RAISE EXCEPTION 'No se pueden registrar personas que sean menores de 21 años como Juez o Competidor';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_edad_Juez
+BEFORE INSERT ON Juez
+FOR EACH ROW EXECUTE PROCEDURE  validar_edad_Juez_Catador();
+
+CREATE TRIGGER validar_edad_Competidor_Catador
+BEFORE INSERT ON Competidor_Catador
+FOR EACH ROW EXECUTE PROCEDURE  validar_edad_Juez_Catador();
+
+CREATE FUNCTION validar_tipo_cata_concurso()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Tipo_Concurso = 'Vino' AND NEW.Tipo_Cata = 'A ciegas' THEN
+        RAISE EXCEPTION 'No se puede seleccionar "A ciegas" como tipo de cata en un concurso de vino, este solo es válido para concursos de catadores.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER tr_validar_tipo_cata_concurso
+BEFORE INSERT OR UPDATE ON Concurso
+FOR EACH ROW
+EXECUTE FUNCTION validar_tipo_cata_concurso();
+
+/*Funcion para validar que si el tipo (en presentacion) es botella no pueda llenar cantidad caja */
+CREATE FUNCTION Validar_tipo_presentacion() returns TRIGGER AS $$
+BEGIN
+   IF new.tipo='Botella' AND new.cantidad_caja IS NOT NULL THEN
+        RAISE EXCEPTION 'La presentacion de botella no puede llenar Cantidad_Caja pues este es valido si el tipo de presentacion es Caja';
+   ELSIF NEW.tipo = 'Caja' AND NEW.cantidad_caja IS NULL THEN
+        RAISE EXCEPTION 'La presentacion de caja debe llenar Cantidad_Caja';
+   END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_tipo_presentacion
+BEFORE INSERT OR UPDATE ON presentacion
+FOR EACH ROW
+EXECUTE FUNCTION Validar_tipo_presentacion();
+
+
+
+CREATE FUNCTION Produccion_anual_pais(Nombre_Pais varchar)
+RETURNS TABLE (Pais_nombre varchar, Año_produccion text, Total_Produccion_anual_en_Hect numeric, Exportacion_en_hect numeric,Consumo_Interno numeric) AS $$
+BEGIN
+   RETURN QUERY
+   SELECT pais.nombre as Pais_nombre, to_char(produc.año,'YYYY') as Año_produccion,
+           sum(produc.total_botellas*75/10000) as Total_Produccion_anual_en_Hect,
+          Sum(produc.total_dest_exp_hect) as Exportacion_en_hect,
+          (sum(produc.total_botellas*75/10000)-Sum(produc.total_dest_exp_hect)) as Consumo_Interno
+   FROM vino_marca as vino, bodega as bog, produccion_anual_vino as produc, pais_productor as pais, regionvinicola_do as regi
+   WHERE pais.nombre = Nombre_Pais
+     AND regi.idpaisproduc = pais.idpaisproduc
+     AND bog.idpaisproduc = regi.idpaisproduc
+     AND bog.idregion = regi.idregion
+     AND vino.idpaisproduc = bog.idpaisproduc
+     AND vino.idregion = bog.idregion
+     AND vino.idbodega = bog.idbodega
+     AND produc.idvino = vino.idvino
+     AND produc.idbodega = vino.idbodega
+     AND produc.idregion = vino.idregion
+     AND produc.idpaisproduc = vino.idpaisproduc
+   GROUP BY produc.año, pais.nombre
+   ORDER BY produc.año DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION Produccion_anual_bodega(Nombre_Bodega varchar) returns table (Bodega_nombre varchar,Año_produccion text,Total_Produccion_anual_en_Hect numeric) AS $$
+BEGIN
+   return query select bog.nombre as Bodega_nombre,to_char(produc.año,'YYYY') as Año_produccion ,sum(produc.total_botellas*75/10000) as Total_Produccion_anual_en_Hect from vino_marca as vino,bodega as bog,produccion_anual_vino as produc
+    where bog.nombre=Nombre_Bodega  and  bog.idpaisproduc=vino.idpaisproduc and bog.idregion=vino.idregion and bog.idbodega=vino.idbodega
+    and produc.idbodega=vino.idbodega and produc.idvino=vino.idvino and produc.idregion=vino.idregion and produc.idpaisproduc=vino.idpaisproduc
+   group by produc.año, bog.nombre
+   order by produc.año desc ;
+
+
+END;
+$$ LANGUAGE 'plpgsql';
+
+
+CREATE FUNCTION Produccion_anual_marca(Nombre_Bodega varchar,Nombre_Vino varchar) returns table (Vino_nombre varchar,Año_produccion text,Total_Produccion_anual_en_Hect numeric) AS $$
+BEGIN
+   return query select vino.nombre as Vino_nombre,to_char(produc.año,'YYYY') as Año_produccion ,produc.total_botellas*75/10000 as Total_Produccion_anual_en_Hect from vino_marca as vino,bodega as bog,produccion_anual_vino as produc
+    where bog.nombre=Nombre_Bodega and Nombre_Vino=vino.nombre and  bog.idpaisproduc=vino.idpaisproduc and bog.idregion=vino.idregion and bog.idbodega=vino.idbodega
+    and produc.idbodega=vino.idbodega and produc.idvino=vino.idvino and produc.idregion=vino.idregion and produc.idpaisproduc=vino.idpaisproduc
+   group by produc.año, vino.nombre, produc.total_botellas*75/10000
+   order by produc.año desc ;
+
+
+END;
+$$ LANGUAGE 'plpgsql';
+
+
+CREATE OR REPLACE FUNCTION Validar_nuevo_precio() RETURNS TRIGGER AS $$
+DECLARE
+    calificacion CHAR(10);
+    valor NUMERIC;
+BEGIN
+    SELECT produc.clasificación_añadas, new.precio
+    INTO calificacion, valor
+    FROM produccion_anual_vino AS produc
+    WHERE produc.idregion=new.idregion AND produc.idpaisproduc=new.idpaisproduc AND produc.idbodega=new.idbodega
+    AND produc.idvino=new.idvino and produc.año=new.año;
+
+    -- Aumentar el precio según la calificación de la añada
+    IF calificacion  = 'E' THEN
+        valor := valor * 1.25; -- Aumentar un 25% para añadas muy buenas
+    ELSIF calificacion = 'MB' THEN
+        valor := valor * 1.1; -- Aumentar un 10% para añadas buenas
+    END IF;
+
+    if new.precio> valor then
+         RAISE exception 'El precio máximo permitido es: %', valor;
+    end if;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER Validar_Precio_Anada
+BEFORE INSERT OR UPDATE ON historico_precio
+FOR EACH ROW EXECUTE PROCEDURE Validar_nuevo_precio();
+
+
+CREATE FUNCTION Porcentaje_viñedo_mundial(Nombre_Pais varchar) returns void AS $$
+    declare
+        valor numeric;
+        aux numeric;
+    BEGIN
+    select pais.superficie_viñedo_en_hectarea into valor from pais_productor as pais
+        where Nombre_Pais=pais.nombre;
+    aux:=valor;
+    valor:= valor*100/7300000;
+
+    raise notice 'El porcentaje que ocupa del viñedo mundial es el: %', valor;
+    raise notice 'En hectareas seria: % porciento', aux;
+END;
+$$ LANGUAGE 'plpgsql';
+
+
+INSERT INTO pais_productor
+    (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Argentina',
+        'Am',
+        'Argentina es un país vitivinícola destacado, conocido por sus vinos tintos, especialmente el Malbec. Su combinación de variedades de uvas, climas diversos y tradición enológica ha posicionado a Argentina como un productor de vinos de calidad y ha ganado reconocimiento a nivel internacional.',
+        207000,
+        'Dolar Americano');
+COMMIT;
+INSERT INTO pais_productor
+    (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Italia',
+        'Eu',
+        'Italia es famosa por su larga tradición vitivinícola y ofrece una amplia variedad de vinos de alta calidad. Desde los tintos elegantes de la Toscana hasta los frescos blancos del norte, Italia es conocida por su diversidad y excelencia en la producción vinícola. Además, sus vinos espumantes y el icónico Barolo son reconocidos a nivel mundial. En resumen, Italia es un destino imprescindible para los amantes del vino debido a su amplia gama de estilos y su reputación enológica.',
+        718000,
+        'Euro');
+COMMIT;
+
+
+INSERT INTO pais_productor
+    (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Estados Unidos',
+        'Am',
+        'Estados Unidos es un país vinícola diverso con una gran variedad de regiones productoras de vino. Desde la costa oeste de California hasta el estado de Washington y Oregón, Estados Unidos es conocido por sus vinos de alta calidad y su enfoque en la innovación y la experimentación enológica.',
+        390000,
+        'Dolar Americano');
+COMMIT;
+
+INSERT INTO pais_productor
+    (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Sudáfrica',
+        'Af',
+        'Sudáfrica es un país emergente en la escena vinícola mundial y ha ganado reconocimiento por sus vinos de calidad. Con una combinación de climas diversos y una rica historia vitivinícola, Sudáfrica produce vinos notables, especialmente los tintos basados en la uva Pinotage y los blancos frescos y afrutados como el Chenin Blanc y el Sauvignon Blanc.',
+         140000,
+        'Dolar Americano');
+COMMIT;
+
+INSERT INTO pais_productor
+        (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Francia', 'Eu', 'Francia es reconocida mundialmente por su producción de vino, siendo uno de los mayores productores a nivel global. La diversidad de su clima y suelo permite la producción de una amplia gama de vinos con una variedad de estilos y sabores. La producción oficial de vino tranquilo en Francia ascendió a unos 37,8 millones de hectolitros en 2021.',
+ 797000, 'Euro');
+COMMIT;
+
+
+INSERT INTO pais_productor
+        (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('España', 'Eu', 'España, con la mayor superficie de viñedos en el mundo y siendo el tercer mayor productor de vino, es conocida por sus vinos tintos y blancos. La producción de vino en España para 2021 se estimó en 35,3 millones de hectolitros.',
+ 955000, 'Euro');
+COMMIT;
+
+
+INSERT INTO pais_productor
+        (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES ('Chile', 'Am', 'Chile es conocido por producir vinos de alta calidad. Sus condiciones geográficas y climáticas hacen que sea un lugar ideal para la viticultura. La producción de vino en Chile se espera que aumente un 30% debido a las excelentes condiciones climáticas, estimándose unos 13,4 millones de hectolitros, lo que también será una producción récord para Chile',
+ 196000, 'Dolar Americano');
+COMMIT;
+
+
+INSERT INTO pais_productor
+        (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES('Brasil', 'Am', 'Brasil tiene una creciente industria del vino, conocida principalmente por sus vinos espumosos. La producción de vino en Brasil alcanzó los 3,2 millones de hectolitros en 2022, siendo el segundo volumen más alto durante el período reportado.',
+81000, 'Dolar Americano');
+COMMIT;
+
+
+INSERT INTO pais_productor
+        (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
+VALUES('Uruguay', 'Am', 'Uruguay es un pequeño productor de vino en América del Sur, famoso por su producción de vinos Tannat. La producción de vino en Uruguay es de 684,000 hectolitros/año, y la producción varía significativamente de año en año debido a las condiciones climáticas.',
+72500, 'Dolar Americano');
+COMMIT;
+
+
+/*INSERT DE REGION*/
+/*argentina*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (1,
+        'Valles Calchaquíes',
+        'Los Valles Calchaquíes, ubicados en el noroeste de Argentina, son conocidos por su producción de vinos de alta calidad. Esta región vinícola se caracteriza por su altitud y suelos áridos, lo que crea condiciones ideales para el cultivo de uvas. Los vinos de Valles Calchaquíes suelen ser intensos y concentrados, con sabores frutales vibrantes y una buena estructura.');
+COMMIT;
+
+/*italia*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (2,
+        'Piamonte',
+        'Piamonte, en Italia, es famoso por ser una de las regiones vinícolas más prestigiosas del país. Se destaca por sus tintos de renombre mundial, como el Barolo y el Barbaresco, elaborados principalmente con la uva Nebbiolo. Los vinos de Piamonte son conocidos por su elegancia, estructura y complejidad, con sabores que van desde frutas maduras hasta notas terrosas y especiadas.');
+COMMIT;
+
+/*EEUU*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (3,
+        'Willamette Valley',
+        'Willamette Valley, en el estado de Oregón, es una región vinícola reconocida por su producción de vinos Pinot Noir de alta calidad. El clima fresco y los suelos volcánicos de la región brindan condiciones ideales para el cultivo de esta uva delicada. Los vinos de Willamette Valley son conocidos por su elegancia, sutileza y sabores frutales intensos, con una acidez equilibrada y taninos suaves.');
+COMMIT;
+
+/*Sudafrica*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (4,
+        'Constania',
+        'Constantia, ubicada cerca de Ciudad del Cabo, en Sudáfrica, es una región vinícola histórica y reconocida. Se destaca por sus vinos blancos dulces y de postre, especialmente el famoso Vin de Constance, elaborado con la uva Muscat de Frontignan. Los vinos de Constantia son conocidos por su riqueza aromática, sabores tropicales intensos y equilibrio entre dulzura y acidez, creando experiencias sensoriales únicas.');
+COMMIT;
+/*italia*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES(2,'Veneto', 'Veneto es una región vinícola importante en el noreste de Italia. Aunque es ligeramente más pequeña que otras regiones vinícolas principales de Italia como Piamonte, Toscana, Lombardía, Puglia y Sicilia, produce más vino que cualquiera de ellas. En términos de geografía, cultura y estilos de vino, representa una transición entre el extremo alpino, germánico-eslavo de Italia y las tierras más cálidas, secas y romanas del sur.');
+COMMIT;
+
+/*España*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES(6,'Rioja ', 'La región vinícola de Rioja se encuentra en el norte de España. Rioja puede referirse a esta región vinícola o al vino producido en la región. A lo largo del río Ebro, Rioja es el hogar de algunos de los vinos más prestigiosos de España');
+COMMIT;
+
+/*Francia*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES(5,'Bordeaux', 'Bordeaux, en el suroeste de Francia, es una de las regiones vinícolas más famosas, prestigiosas y prolíficas de Francia. Los vinos producidos van desde grandes cantidades de vino de mesa cotidiano hasta algunos de los vinos más caros y prestigiosos del mundo.');
+COMMIT;
+
+/*Chile*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (7,'Maipo Valley', 'El Valle del Maipo es una de las regiones vinícolas más importantes de Chile. Ubicado justo al sur de la capital, Santiago, el Valle del Maipo es el hogar de algunos de los vinos más prestigiosos del país');
+COMMIT;
+
+/*argentina*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (1,'Mendoza', 'Mendoza es una de las regiones vinícolas más poderosas de Argentina. Responsable de vinos de alta calidad con gran complejidad, el vino de la región es muy celebrado.');
+COMMIT;
+
+/* Brasil*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (8,'Serra Gaúcha', 'Serra Gaúcha es la región vinícola más grande de Brasil, representando el 85% de la producción de vino en el país. Esta región es famosa por sus vinos espumosos y variedades de uva como Chardonnay, Moscato Blanca, Riesling, Cabernet Sauvignon, Merlot y Tannat. También es notable por su única Denominación de Origen, Vale dos Vinhedos.');
+COMMIT;
+
+/*Uruguay*/
+INSERT INTO regionvinicola_do (idPaisProduc, Nombre, Descripcion)
+VALUES (9,'Northern Riverside', 'Northern Riverside es una de las seis regiones vinícolas de Uruguay. Esta región abarca el Río Uruguay y los departamentos de Artigas, Paysandú y Salto. Se encuentra en una altitud de entre 50 y 60 metros sobre el nivel del mar.');
+COMMIT;
+
+/*INSERT DE BODEGA*/
+/*Aregntina*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (1,1,to_date('1831','YYYY')
+       ,'Bodega Colomé es una bodega argentina que produce vinos de altura excepcionales y de producción limitada, cultivados con prácticas amigables con el medio ambiente en un microclima puro. La bodega fue fundada con la visión de hacer los mejores vinos de altura del mundo. En 2001, los empresarios y pioneros Donald y Úrsula Hess adquirieron la bodega con el objetivo de producir vinos únicos de alta gama en los altos Valles Calchaquíes . Actualmente, la bodega está dirigida por la segunda generación, Larissa y Christoph Ehrbar
+        La bodega produce alrededor de 2 millones de botellas al año y emplea a unas 200 personas en Argentina. Opera en seis fincas diferentes en alturas que van desde los 1.700 metros hasta los 3.111 metros.'
+        ,'Ruta Prov. 53 Km 20, Molinos 4419','https://www.bodegacolome.com/vinos/','Colomé');
+COMMIT;
+/*italia*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (2,2,to_date('1930','YYYY'),
+        'La bodega Ceretto, ubicada en Alba, Italia, ha sido reconocida como la mejor bodega de Italia según el ranking World''s Best Vineyards 2023, superando a Catena Zapata de Argentina. Fundada en la década de 1930 por Riccardo Ceretto, la bodega se destacó por su enfoque innovador en la importancia de la tierra en la producción de vinos.
+         Ceretto se ha destacado por su compromiso con la calidad y la expresión auténtica del terruño. Su enfoque en la tierra y la pasión por el vino han contribuido a su posición privilegiada en la escena vinícola internacional.'
+        ,'Carretera Provincial Alba/Barolo Localidad San Cassiano, 34, 12051 Alba CN,Italia','https://ceretto.com/en//cantina-bricco-rocche','Ceretto');
+COMMIT;
+/*EEUU*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (3,3,to_date('1998','YYYY'),
+        'Bodega Brooks Wine, ubicada en el Valle de Willamette en los Estados Unidos, es una bodega galardonada que produce una variedad de vinos excepcionales. ¡Estamos emocionados de anunciar que Brooks ha sido nombrada número 28 de las Mejores Bodegas del Mundo 2023! Este prestigioso reconocimiento nos coloca entre las mejores bodegas a nivel global y nos convierte en una de las dos bodegas en Estados Unidos que ha recibido este honor.'
+        ,'21101 SE Cherry Blossom Lane Amity, OR 97101',' https://www.brookswine.com/collection/all-wines/','Brooks Wine');
+COMMIT;
+/*Sudafrica*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (4,4,to_date('1685','YYYY'),
+        'Klein Constantia, ubicada en el Valle de Constantia en Ciudad del Cabo, Sudáfrica, es una bodega con una rica historia que se remonta a 1685. Fundada por Simon van der Stel, el primer gobernador de la ciudad, esta bodega se encuentra en un entorno impresionante, rodeada de árboles centenarios y con vistas a la Bahía Falsa. Es considerada una de las bodegas más hermosas del mundo.
+Algunos aspectos destacados de Klein Constantia incluyen:
+Vin de Constance: Uno de los vinos dulces naturales más famosos del mundo se produce aquí. Este vino es una verdadera joya y ha recibido elogios tanto a nivel sudafricano como internacional.
+Filosofía de calidad: Klein Constantia se enfoca en la calidad en lugar de la cantidad, lo que se refleja en sus vinos galardonados.
+Variedades de uva cultivadas: Entre las variedades cultivadas se encuentran Riesling, Pinot Noir, Pinot Gris, Pinot Blanc, Viognier, Muscat, Petite Syrah, Tempranillo, Gewurztraminer, Melon, Rosado y Espumoso'
+        ,'Klein Constantia Estate, PO Box 375, Constantia, 7848','https://www.kleinconstantia.com/wine/our-wines/','Klein Constantia Winery');
+COMMIT;
+/*España Rioja*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (6,6,to_date('1994','YYYY'),
+    'Bodega Miguel Merino es una pequeña bodega familiar ubicada en Briones, en la Rioja Alta. Fue fundada por Miguel Merino, quien comenzó su carrera como exportador de vinos en los años 70 y siempre soñó con crear una pequeña bodega donde elaborar vinos de la mejor calidad posible. En 1994, logró elaborar su primera cosecha. Hoy en día, la bodega sigue avanzando por el camino que emprendió Miguel Merino, disfrutando mucho de hacer vino.',
+    'Calle San Juan, 34, 26330 Briones',
+    'https://www.miguelmerino.com',
+    'Miguel Merino');
+COMMIT;
+
+/*España Rioja*/
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (6,6,to_date('1982','YYYY'),
+    'Bodegas Gregorio Martinez es una bodega familiar ubicada en Navarrete, en la Rioja Alta. Fue fundada por Gregorio Martinez, quien comenzó su carrera como viticultor en los años 60 y siempre soñó con crear una bodega donde elaborar vinos de la mejor calidad posible. En 1982, logró elaborar su primera cosecha. Hoy en día, la bodega sigue avanzando por el camino que emprendió Gregorio Martinez, disfrutando mucho de hacer vino.',
+    'Calle de la Bodega, 16, 26370 Navarrete',
+    'https://www.bodegasgregoriomartinez.com',
+    'Gregorio Martinez');
+COMMIT;
+
+/*Argentina mendoza */
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (9,1,to_date('1902','YYYY'),
+  'La Bodega Catena fue fundada en 1902 por el bisabuelo de Laura Catena, después de emigrar de Italia. Esta bodega ha jugado un papel importante en la vitivinicultura moderna de la provincia de Mendoza.',
+  'Calle Ficticia 123, Mendoza',
+  'www.bodegacatena.com',
+  'Catena');
+COMMIT;
+
+/*Italia veneto */
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (5,2,to_date('2012','YYYY'),
+    'PDC Cartizze es una bodega especializada exclusivamente en la producción de vino Cartizze (Prosecco DOCG Valdobbiadene Superiore di Cartizze). Es un producto de excelencia, un vino certificado orgánico con especial atención al diseño contemporáneo. Solo cultivan y procesan uvas producidas en la zona de Cartizze. La empresa puede contar con el apoyo de técnicos especializados en el viñedo y en la bodega y un equipo joven y dinámico para recibir a los clientes.',
+    'Via Cartizze 5, 31049 - Valdobbiadene',
+    'https://cartizzepdc.com/en/',
+    'PDC Cartizze');
+COMMIT;
+
+/*Argentina mendoza */
+INSERT INTO bodega(idregion, idpaisproduc, fecha_fundacion, resumen_empresa, direccion, pagina_web, nombre)
+VALUES (9,1,to_date('1919','YYYY'),
+  'La Bodega Norton comenzó a ser construida en el año 1919. Con el paso de los años, ha jugado un papel importante en la vitivinicultura de la provincia de Mendoza.',
+  'Calle Ficticia 456, Mendoza, Argentina',
+  'www.bodeganorton.com',
+  'Norton');
+COMMIT;
+
+/*INSERT DE TELEFONO*/
+/*Argentina*/
+INSERT INTO telefono(codigoint, codarea, numero, dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES (54, 03868, 494200,null,null,null,null,1,1,1);
+COMMIT;
+
+/*Italia*/
+INSERT INTO telefono(codigoint, codarea, numero, dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES (39,0173,282582,null,null,null,null,2,2,2);
+COMMIT;
+
+INSERT INTO telefono(codigoint, codarea, numero, dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES (39,0173,268033,null,null,null,null,2,2,2);
+COMMIT;
+
+/*EEUU*/
+INSERT INTO telefono(codigoint, codarea, numero, dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES (1,0503,4351278,null,null,null,null,3,3,3);
+COMMIT;
+/*Sudafrica*/
+
+INSERT INTO telefono(codigoint, codarea, numero, dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES (27,0,217945188,null,null,null,null,4,4,4);
+COMMIT;
+
+/*España*/
+INSERT INTO telefono(codigoint, codarea, numero,
+                     dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES(54,261,4909700,null,null,null,null,5,6,6);
+COMMIT;
+
+/*España*/
+INSERT INTO telefono(codigoint, codarea, numero,
+                     dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES(54,261,4131100,null,null,null,null,6,6,6);
+COMMIT;
+
+/*Argentina*/
+INSERT INTO telefono(codigoint, codarea, numero,
+                     dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES(34,941,226263,null,null,null,null,7,9,1);
+COMMIT;
+
+/*Italia*/
+INSERT INTO telefono(codigoint, codarea, numero,
+                     dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES(39,347,8344395,null,null,null,null,8,5,2);
+COMMIT;
+
+/*Argentina */
+INSERT INTO telefono(codigoint, codarea, numero,
+                     dicatador, dijuez, idorganizacion, idpaisproducorg, idbodega, idregion, idpaisproducbog)
+VALUES(34,941,322263,null,null,null,null,9,9,1);
+COMMIT;
+
+/*INSERT DE CLASIFICACION*/
+insert into clasificacion_estilos( nombre, nivel, descripcion)
+values ('Vino Blanco',1,'Vino hecho con uvas blancas');
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion)
+values ('Vino Tinto',1,'Vino hecho con uvas tintas');
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Ligero y seco ',2,
+       'Un vino refrescante y crujiente, con sabores sutiles de manzana verde, pera y cítricos',1);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Seco y amplio',2,
+       'Es un vino rico y complejo, con una textura suave y aterciopelada y ' ||
+       'sus sabores pueden incluir frutas de hueso maduras, como melocotón y albaricoque.',1);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Seco y concentrado ',2,
+       'Es un vino intenso y robusto, con una densidad de sabor que llena el paladar ' ||
+       'y sus saboros pueden incluir frutas tropicales maduras, como piña y mango,',1);
+
+
+insert into clasificacion_estilos( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Aromaticos ',2,
+       'Es fragante y expresivo, con un bouquet de aromas que pueden incluir flores' ||
+       ' blancas, frutas cítricas, melón, lichi, y a veces notas de especias como el anís.',1);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Semi-secos ',2,
+       'Es un vino que tiene una concentración de azúcar de entre 6 y 12 gramos por litro ' ||
+       'y con sabor dulce de la fruta madura. ',1);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Dulces y licorosos ',2,
+       'Es un vino vino con un alto contenido de azúcar, con aromas complejos y amielados, ' ||
+       'y que se produce a partir de uvas con un alto índice de maduración y una fermentación incompleta.',1);
+
+
+insert into clasificacion_estilos( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Rosados ',2,
+       ' Es un vino fresco y agradable de beber, a la vez que posee aromas y sabores ' ||
+       'más complejos característicos de uvas tintas',2);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Ligeros,afrutados,no envejecidos ',2,
+       ' Tienen un cuerpo más liviano, son bajos en taninos y ' ||
+       'destacan por sus sabores frutales intensos, como cereza, frambuesa o fresa. ',2);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('De cuerpo medio ',2,
+       ' Tienen una estructura equilibrada, con sabores que combinan frutas maduras y toques especiados, ' ||
+       'presentando taninos suaves y una sensación en boca más robusta que los vinos ligeros.',2);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Concentrados e intensos  ',2,
+       'Se caracteriza por tener una alta densidad de sabores y aromas. Suele presentar una gran profundidad de color,' ||
+       ' con una riqueza notable en frutas maduras, especias y a menudo notas terrosas o de madera.',2);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('De guarda ',2,
+       'Es un vino  robusto, con taninos firmes y una estructura compleja. ' ||
+       'Tiene potencial para evolucionar en sabor y aroma con el paso de los años',2);
+
+
+insert into clasificacion_estilos ( nombre, nivel, descripcion,idpadreclasificacion)
+values ('Especiales ',2,
+       'Es único en su sabor y aroma, con una complejidad notable que revela sabores distintivos y ' ||
+       'capas aromáticas. Suele tener una estructura equilibrada, con notas intensas',2);
+
+
+insert into clasificacion_estilos (nombre,nivel,descripcion,idpadreclasificacion)
+values ('Secos',3,' Suele tener un color rojo oscuro, a veces con tonalidades violetas. ' ||
+       'Su sabor es intenso y a menudo se describen notas frutales, como la ciruela, la mora o el cassis',14);
+
+
+insert into clasificacion_estilos (nombre,nivel,descripcion,idpadreclasificacion)
+values ('Semi-secos',3,'Posee color rojo limpio y brillante, aromas herbáceos a frutos rojos con notas herbáceas y ' ||
+       'especiadas y de sabor delicado con buena acidez y final largo ',14);
+
+
+insert into clasificacion_estilos (nombre,nivel,descripcion,idpadreclasificacion)
+values ('Dulces',3,'Tienen un color rojo rubí con reflejos violeta. Presentan aromas a moras, ciruelas y cerezas negras.
+       Son vinos frescos y equilibrados, persistentes en boca y muy fáciles de tomar. ',14);
+
+/*INSERT VINOS*/
+/*COLOMÈ*/
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (1,1,1,'Colomé 1831 Cabernet Sauvignon',14.5
+        ,'Este vino exhibe notas a frutas rojas y herbáceas típicas del varietal en nuestro terruño salteño, seguidas por una acidez vibrante y taninos elegantes.'
+       ,'Este vino es ideal para acompañar carnes rojas, cordero, quesos maduros y platos con salsas intensas.',
+        'De color rojo rubí brillante. Su nariz es elegante y fresca, frutas rojas, especias y notas herbáceas de hierbas silvestres típicas del varietal. Además unas notas integradas del tostado de las barricas de roble. Es un vino muy frutado y fresco, con buen volumen y taninos elegantes.',
+        18,3.7,5.6,18,20,2
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (1,1,1,'Colomé Torrontés',13.5
+        ,'Es un vino blanco de altura, elaborado con uvas Torrontés cultivadas en los Valles Calchaquíes de Salta, Argentina. Este vino es conocido por su frescura y aroma floral, con notas de frutas cítricas y tropicales.'
+       ,'Este vino es ideal para acompañar platos de mariscos, pescados, ensaladas y quesos suaves.',
+        'Es un vino elegante, se destacan notas orales a jazmín y cítricas. En boca es fresco, redondo y de buen cuerpo. El final es largo y de una gran fineza.',
+        8,3.4,6.8,12,5,1
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (1,1,1,'Lote Especial Bonarda',14
+        ,'Es un vino tinto de altura, elaborado con uvas Bonarda cultivadas en los Valles Calchaquíes de Salta, Argentina. Este vino es conocido por su concentración y complejidad, con notas de frutas negras y rojas, con un especiado mentolado.'
+       ,'Este vino es ideal para acompañar carnes rojas, cordero, quesos maduros y platos con salsas intensas.',
+        'La variedad Bonarda es muy popular en Argentina, principalmente en Mendoza. La idea de este Lote Especial es mostrar otra expresión de esta variedad de los viñedos de Finca Colomé a 2300 metros. De color rubí con matices violetas, en nariz se destacan frutas negras y rojas, con un especiado mentolado. Concentrado y complejo, tiene un buen volumen y frescura en boca. ',
+        18,3.6,5.1,16,20,2
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (1,1,1,'Altura Máxima Sauvignon Blanc',12.5
+        ,'Es un vino blanco de altura, elaborado con uvas Sauvignon Blanc cultivadas en los Valles Calchaquíes de Salta, Argentina. Este vino es conocido por su frescura y aroma floral, con notas de frutas cítricas y tropicales.'
+       ,'Este vino es ideal para acompañar carnes blancas, mariscos, pescados, pastas y ensaladas.',
+        'De color dorado, el vino es muy complejo en nariz, con mucha fruta blanca y exótica, notas florales y minerales, con un toque herbáceo típico de la variedad. En boca es muy frutado y fresco, con notas tostadas de la madera que da una gran complejidad al vino.',
+        8,3.3,6.5,8,5,1
+       );
+COMMIT;
+/*BROOKS WINES*/
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (3,3,3,'2021 Janus Pinot Noir',13.5
+        ,'Este vino es un vino elegante y equilibrado con notas complejas de flores secas, fresas silvestres y cerezas luxardo con taninos bien integrados.'
+       ,'Este vino es ideal para acompañar platos como confit de pato en salsa de cereza agria con papas sarladaise.',
+        'Es muy complejo en nariz, con notas que recuerdan a un filete en una sartén caliente, frutas rojas y aromas de pimienta .En el paladar, el vino es expresivo con notas de bayas rojas, taninos frescos y acidez equilibrada. ',
+        18,3.56,4.7,18,20,2
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (3,3,3,'2022 Pinot Noir Rosé',14
+        ,'Vino con notas de fresas silvestres, ruibarbo y dulces aplastados.
+        Un rosado refrescante con notas veraniegas de fresa, ruibarbo, frambuesa y un delicioso final de sandía alegre ranchero.'
+       ,'Será un buen acompañante para postres como tartas de fresas, además para platos como confit de pato con salsa de cereza agria y papas sarladaise.',
+       'Tiene un aroma a berros, frambuesa, mandarinas, zumo y fresas. En el paladar, el vino tiene notas de sandía Jolly Rancher, fresa Starburst y conservas de ruibarbo. El vino es equilibrado con una acidez crujiente, un paladar medio redondo y un final de arándano suculento.',
+        10,3.32,6.6,16,3,9
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (3,3,3,'2019 Yamhill Riesling',12
+        ,'Es un vino blanco seco y fresco con una acidez vibrante y notas expresivas de limón, manzanilla fresca, pera verde D’Anjou y un final largo y salado de dólar de arena. Está compuesto de uvas Riesling de Geisenheim 110 de la viña Yamhill ubicada en Yamhill-Carlton. Las vides fueron plantadas en 1984 en suelo sedimentario marino-willakenzie. Solo se produjeron 75 cajas. El vino tiene un sabor a piña. El vino es una excelente opción para un día caluroso de verano con notas frescas de cítricos, frutas tropicales y frutas de hueso con una acidez picante.'
+       ,'Pueden acompañar una amplia variedad de platos, desde mariscos y pescados hasta carnes blancas y picantes. También son excelentes para maridar con platos asiáticos, como la cocina china y tailandesa, que tienen sabores dulces y picantes.',
+       'Un Riesling fresco y vivaz con una acidez vivaz y expresivas notas de limón, frescas manzanilla, pera D''Anjou verde y una Final largo y salado en forma de dólar de arena.',
+        8,2.88,9,18,5,1
+       );
+COMMIT;
+
+INSERT INTO vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (3,3,3,'2021 Brooks Estate Riesling',12
+        ,'Fiel a la vendimia más fresca de 2021, nuestro Riesling de la finca es un vino vibrante y con una acidez destacada, con muchos años por delante. Los aromas dominantes son de cáscara de limón y lima, piel de naranja rallada y pera amarilla. En boca, este vino es eléctrico, con limón meyer y sal marina, lo que le da un final jugoso y vibrante.'
+       ,'Disfruta con pescado al horno mediterráneo, como el bacalao, con tomates cherry asados, aceitunas, kalamata, cebollas, ajo e hinojo rallado. Sirve con un acompañamiento de cuscús de hierbas y un toque de limón fresco.',
+       'Este vino es de color pajizo con nariz a cera de abejas, oleo cítrico, con matices de azucena blanca. En boca, la primera impresión es de una acidez vivaz y persistente. Sin embargo, la sensación en boca tiene un poco de peso por haber sido envejecido en barrica y hermosas notas de pera dorada, ralladura de limón y pizarra.',
+        8,2.92,9.1,20,5,1
+       );
+COMMIT;
+
+/*CERETTO*/
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (2,2,2,'Ceretto Langhe Arneis Blangé 2021',13,'Ceretto Blangé es un buen ejemplo de la expresión de la uva nativa Arneis. Es un agradable blanco de cuerpo medio, fresco y fragante. Ideal en combinación con platos de pescado y aperitivos, risotto con verduras, pasteles salados.',
+        ' Ensalada de arroz / Áspic de trucha / Carbonara vegetariana / Ternera con salsa de atún','A la vista tiene un color amarillo pajizo brillante. En nariz es mineral e intensamente afrutado, con toques claros de pera madura y manzana verde. En boca es fragante, sabroso, fresco y con un final persistente.',
+        10,8,8,5,8,1);
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (2,2,2,'Ceretto Barolo Brunate 2016',15,'El Barolo ''Brunate'' de Ceretto es un tinto noble y fino procedente de viñedos situados hasta 400 metros sobre el nivel del mar y con una crianza de 24 meses en toneles y grandes barricas. Aromas afrutados, balsámicos, especiados y etéreos. Extraordinaria elegancia, estructura, frescura y persistencia.',
+        'Pasta/Carne/Carne de Caza/Quesos/Cerdo','De color rojo granate intenso, la nariz revela un bouquet compuesto, rico, amplio y persistente, con sabores de vainilla, especias dulces, tabaco, heno de montaña y sotobosque. Impresionantes sensaciones gustativas revelan su carácter imperioso, noble, cálido y aterciopelado. La persistencia aromática es larga e intensa. Ideal para acompañar carnes rojas, asados y caza.',
+        18,4,4,24, 10,2);
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje,
+                        cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses,
+                        promedio_años_consumo, idclasificacion)
+values (2,2,2,'Ceretto Moscato d''Asti 2023',5.5,'Ceretto es uno de los grandes nombres de Barolo, pero también de otras denominaciones. Su apuesta por el terruño, por lo tradicional y por la innovación tecnológica, así como su gradual conversión al cultivo ecológico son palpables y evidentes en los vinos de todas las denominaciones del bajo Piamonte en las que trabaja. Entre ellas, destaca naturalmente Moscato d''Asti, donde esta familia ofrece unos vinos que han llegado a convertirse en verdaderos iconos, símbolo de la calidad a muy buen precio.',
+        'Tarta de avellanas / Besos de dama / Galletas de mantequilla / Pandoro','En nariz es intenso, aromático, afrutado, como corresponde a un buen moscato d''Asti. Sus aromas son de manual: salvia, hierbas aromáticas, melocotón, fruta de la pasión, pero se reconocen también en él algunas notas minerales, confitadas y un suave fondo balsámico. En boca es dulce y aromático, en equilibrio con su bajo contenido alcohólico, y con un agradable frescor que lo convierte en un vino versátil y una muy buena opción para acompañar tanto postres como para sorprender con un apetecible y cremoso aperitivo.',
+        6,3,3.5,6,5,8);
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (2,2,2,'Ceretto Barolo Chinato',17,'La historia de este vino está vinculada a la animada realidad vitivinícola de la Langa a finales del siglo XIX. Sus protagonistas son el Dr. Cappellano de Serralunga y el Dr. Zabaldano de Monforte, que supieron aplicar, cada uno según su fórmula, las propiedades de la China Calissaia al Barolo, creando un elixir de fama comercial inmediata y fortuna duradera dentro de la cultura campesina de la región. Tras suscitar cierto interés en el mercado, el Barolo Chinato conoció la indiferencia en las décadas posteriores a la Segunda Guerra Mundial, precisamente en correspondencia con la crisis de los modelos culturales campesinos. Ceretto se dio cuenta de su importancia y fue uno de los protagonistas de su resurgimiento a finales de la década de 1980. ',
+        'Puede considerarse un excelente final de comida y va bien con postres a base de chocolate.','La nariz expresa aromas florales en juventud que con el tiempo dan paso a aromas etéreos de especias, chocolate y trufas. En boca tiene un impacto amargo bien equilibrado por el azúcar y el alcohol, en una continua sucesión de sabores que finaliza con un agradable retorno amargo.',
+        14,3.5,4.5,38,20,6);
+commit;
+
+/*SUDAFRICA*/
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (4,4,4,'Vin de Constance',13.5,'Klein Constantia Vin de Constance es uno de los vinos más emblemáticos de Sudáfrica. Un vino dulce extraordinario con más de 300 años de historia que ha sido fruto de inspiración de grandes literarios del siglo XIX como Charles Dickens, Jane Auste, Klopstock, Baudelaire.',
+        'Postres dulces, Postres de frutas','De vibrante y brillante apariencia dorada, este vino tiene una nariz ricamente aromática con sabores de mermelada de Sevilla, membrillo, jengibre confitado y fruta de hueso. Invita a descubrir sus aromas de manzana roja y caramelo, seguidos de un delicado perfume floral. Fresco y vivaz, en boca es corpulento y sedoso, con una textura que refleja los intrincados sabores que percibimos en la nariz. El vino tiene un dulzor refinado, equilibrado por una elegante salinidad, y la sequedad de las nueces tostadas complementa los sabores frutales, creando un estilo más seco de Vin de Constance. Una poderosa expresión con un final largo, picante y complejo.',
+        10,3.92,6.3,120,15,8);
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES(4,4,4,'Estate Red Blend',14.38,'Con Estate Red Blend, nuestra intención era producir un vino que representara nuestra ubicación única. A lo largo de los años, hemos seleccionado las variedades que mejor se adaptan a nuestro territorio, plantándolas en las laderas más bajas y cálidas de Klein Constantia. Situados en una de las regiones vitivinícolas más frescas de Sudáfrica, somos capaces de alcanzar la madurez en conjunción con taninos delicados, lo que nos permite crear un vino tinto más elegante y refinado.','Debido a su volumen, se recomienda acompañar este vino con comidas de larga cocción.  Ideal para tomar con carnes rojas, caza y pasta.','Color rojo rubí, con bordes amarronados. De intensidad media, La complejidad de la composición varietal de este vino muestra en la nariz aromas de frutos rojos y negros, especias como la pimienta blanca, clavo y cardamomo.  Notas herbales de eucalipto, tomillo y romero.  Están presentes los descriptores olfativos de su paso por barrica como el caco y la vainilla.  es un vino de muicha presencia desde la entrada.  Desarrola todo su volumen con un alto impacto en el medio de boca mostrando sus tatinos redondeados producto del blend de cinco cepas.  Tiene un gran largo de boca con final herbáceo y delicado.  Tiene persistencia alta.',
+  17,3.82,5.1,120, 15,2  );
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (4,4,4,'Anwilka Red Blend',14.42,'El vino ANWILKA RED BLEND es un vino tinto de corte que proviene de Sudáfrica. Está elaborado con 52% de syrah, 37% de cabernet sauvignon y 11% de petit verdot1. Tiene un color rojo rubí intenso, aromas de frutos rojos, especias y chocolate, y un sabor complejo, elegante y persistente1.','Un posible maridaje para este vino es con carnes rojas, como un asado de cordero o un lomo de res a la parrilla. También puede acompañar platos con salsas intensas, como un curry de pollo o un estofado de ternera.','De aspecto rojo rubí profundo. La nariz es franca con aromas de fruta roja oscura y especia de roble. El paladar es audaz y elegante, complejo pero finamente estructurado. El vino concluye con un final persistente y sabroso.',
+        10,3.56,5.3,3,5,2);
+commit;
+
+insert into vino_marca (idbodega, idregion, idpaisproduc, nombre, grado_alcohol, descripcion, maridaje, cata_descripcion, temperatura_en_c, ph, acidez, tiempo_maduracion_en_meses, promedio_años_consumo, idclasificacion)
+VALUES (4,4,4,'Blanc de Blanc',11.67,'El vino Blanc de Blanc es un tipo de vino espumoso elaborado exclusivamente con uvas blancas, generalmente Chardonnay. El término francés significa “blanco de blancos” y se originó en la región de Champagne, donde se producen algunos de los mejores ejemplos de este estilo. El vino Blanc de Blanc se caracteriza por su sabor seco, fresco y cítrico, con notas de manzana roja, brioche y melocotón. También puede tener un toque mineral y panadero, debido al proceso de fermentación y envejecimiento. ','El vino Blanc de Blanc es un excelente acompañante para platos de mariscos, especialmente ostras, sushi, pastel de cangrejo y lubina a la parrilla. También combina bien con quesos duros, como el parmesano, o cremosos, como el brie.','Ligero y vibrante en apariencia. Un ramo vivo de limón zest y sabores de brioche abundan en la nariz. Fresco y animado, el paladar es expresivo, seco y equilibrado por una acidez cítrica. Sabores de limas concluyen con un final crujiente y gratificante.',
+        10,3.26,6.3,36,5,1);
+commit ;
+
+/*insert Variedad_Uva*/
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Cabernet Sauvignon', 'Uva Tinta');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Torrontés', 'Uva Blanca');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Bonarda', 'Uva Tinta');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Sauvignon Blanc', 'Uva Blanca');
+COMMIT;
+
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Pinot Noir', 'Uva Tinta');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Riesling', 'Uva Blanca');
+COMMIT;
+
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Malbec', 'Uva Tinta');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Syrah', 'Uva Tinta');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Chardonnay', 'Uva Blanca');
+COMMIT;
+INSERT INTO variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Moscatel', 'Uva Blanca');
+COMMIT;
+
+insert into variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Arneis','Uva Blanca');
+commit;
+insert into variedad_uva (nombre_variedad, tipo_uva)
+VALUES ('Vitis Vinifera Nebbiolo','Uva Tinta');
+commit;
+insert into  variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Moscato bianco','Uva Blanca');
+commit;
+insert into variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Moscatel de Frontignon','Uva Blanca');
+commit ;
+insert into variedad_uva (nombre_variedad, tipo_uva) VALUES ('Vitis Vinifera Petit Verdot','Uva Tinta');
+commit;
+
+/*Insert Var_Vino*/
+/*Argentina*/
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (1,1,1,1,1);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (2,1,1,1,2);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (3,1,1,1,3);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (4,1,1,1,4);
+COMMIT;
+/*EEUU*/
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (5,3,3,3,5);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (6,3,3,3,5);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (7,3,3,3,6);
+COMMIT;
+INSERT INTO var_vino(idvino, idbodega, idregion, idpaisproduc, idvariedad)
+VALUES (8,3,3,3,6);
+COMMIT;
+/*Italia*/
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (9,2,2,2,11);
+commit;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (10,2,2,2,12);
+commit ;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (11,2,2,2,13);
+commit ;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (12,2,2,2,12);
+commit;
+/*Sudáfrica*/
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (13,4,4,4,14);
+commit;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (14,4,4,4,15),(14,4,4,4,1),(14,4,4,4,7);
+commit;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (15,4,4,4,15),(15,4,4,4,8),(15,4,4,4,1);
+commit ;
+insert into var_vino (idvino, idbodega, idregion, idpaisproduc, idvariedad) VALUES (16,4,4,4,9);
+commit ;
+
+/*Insert Presentacion*/
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (1,1,1,1,'Botella',null,'Presenta un diseño elegante y sofisticado. Con líneas estilizadas y una etiqueta que destaca el nombre del vino y su varietal, esta presentación muestra una imagen de refinamiento y calidad. La botella transmite la historia y tradición de la bodega Colomé, invitando a disfrutar de este excepcional Cabernet Sauvignon, que captura la esencia de los viñedos argentinos.');
+COMMIT ;
+
+INSERT INTO presentacion(IDVINO, IDBODEGA, IDREGION, IDPAISPRODUC, TIPO, CANTIDAD_CAJA, DESCRIPCION)
+VALUES (2,1,1,1,'Botella',null,'Presenta con elegancia y sofisticación. Su diseño combina líneas limpias y modernas, resaltando la calidad y distinción del vino. Con una etiqueta que muestra el nombre de la bodega y el varietal, esta botella captura la atención con su apariencia atractiva y cautivadora. Reflejando la pasión y el legado de la bodega Colomé, esta presentación invita a disfrutar de un vino Torrontés excepcional de Argentina.');
+COMMIT;
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (3,1,1,1,'Botella',null,'Presenta un diseño distintivo y atractivo. Con líneas elegantes y una etiqueta que resalta el nombre del vino y su variedad, esta presentación transmite un sentido de calidad y autenticidad. El diseño cuidadosamente elaborado refleja el compromiso de la bodega Colomé con la excelencia y la tradición vitivinícola. Esta botella invita a disfrutar de un vino Bonarda excepcional, que captura la esencia de los viñedos argentinos y brinda una experiencia única para los amantes del vino.');
+COMMIT ;
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (4,1,1,1,'Botella',null,'Presenta con elegancia y sofisticación. Su diseño muestra líneas limpias y modernas, resaltando la calidad y el carácter distintivo del vino. La etiqueta destaca el nombre del vino y su varietal, capturando la atención con su apariencia atractiva y cautivadora. La presentación refleja la pasión y la dedicación de la bodega Colomé, invitando a disfrutar de un Sauvignon Blanc de alta calidad que representa lo mejor de los viñedos argentinos.');
+COMMIT ;
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (5,3,3,3,'Botella',null,'Su diseño combina líneas limpias y modernas, transmitiendo un sentido de calidad y distinción. La etiqueta destaca el nombre del vino y su añada, capturando la atención con su apariencia atractiva y cautivadora. Esta presentación refleja el cuidado y la pasión con los que se ha elaborado este Pinot Noir, invitando a disfrutar de su sabor excepcional y su carácter distintivo.');
+COMMIT ;
+
+INSERT INTO presentacion(IDVINO, IDBODEGA, IDREGION, IDPAISPRODUC, TIPO, CANTIDAD_CAJA, DESCRIPCION)
+VALUES (6,3,3,3,'Botella',null,'Con líneas suaves y una etiqueta que resalta el nombre del vino y su variedad, esta presentación transmite una imagen de frescura y sofisticación. La botella refleja el carácter vibrante y seductor de este vino rosado, invitando a disfrutar de su sabor refrescante y su encanto cautivador. Esta presentación encarna la dedicación y la calidad con las que se ha elaborado este Pinot Noir Rosé, brindando una experiencia única para los amantes del vino.');
+COMMIT;
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (7,3,3,3,'Botella',null,'Con líneas limpias y una etiqueta que resalta el nombre del vino y su añada, esta presentación transmite un sentido de calidad y refinamiento. La botella refleja la pasión y la dedicación con las que se ha elaborado este Riesling, invitando a disfrutar de su sabor vibrante y su carácter distintivo. Esta presentación captura la esencia de los viñedos de Yamhill y ofrece una experiencia única para los amantes del vino.');
+COMMIT ;
+
+INSERT INTO  presentacion(idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (8,3,3,3,'Botella',null,'Su diseño combina líneas limpias y modernas, transmitiendo un sentido de calidad y distinción. La etiqueta destaca el nombre del vino y su añada, capturando la atención con su apariencia atractiva y cautivadora. Esta presentación refleja el cuidado y la pasión con los que se ha elaborado este Riesling, invitando a disfrutar de su sabor excepcional y su carácter distintivo.');
+COMMIT ;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (9,2,2,2,'Botella',null,null);
+commit;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion) VALUES (10,2,2,2,'Botella',null,'El Ceretto Langhe Arneis Blangé 2021 se presenta en una botella elegante que refleja la calidad del vino en su interior. El vino tiene un color amarillo pajizo brillante que es atractivo a la vista. Al abrir la botella, se desprenden aromas intensos y afrutados, con notas claras de pera madura y manzana verde.');
+commit ;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion) VALUES (11,2,2,2,'Caja',6,'La atrevida originalidad de la botella, diseñada en los años 90 por Giacomo Bersanetti, hace que el moscato d''Asti de Ceretto sea inmediatamente reconocible. También la etiqueta es obra de la genialidad creativa de Bersanetti: una luna creciente de color amarillo claro que rinde homenaje al típico color pajizo del moscato y al escritor Cesare Pavese, autor de la célebre novela La luna y las fogatas (originalmente, La luna e i falò).');
+commit ;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (12,2,2,2,'Botella',null,'La botella de Ceretto Barolo Chinato es elegante y refinada, con un diseño que evoca la tradición y la calidad de este vino aromático y aterciopelado. El color rojo oscuro de la etiqueta contrasta con el fondo blanco y el nombre del vino, escrito con una tipografía clásica y sobria. La etiqueta también muestra el logotipo de Ceretto, una de las familias más prestigiosas del Piamonte italiano, y el sello de la denominación de origen Barolo D.O.C.G. La botella tiene una forma alargada y estilizada, con un cuello alto y una cápsula dorada que protege el corcho.');
+commit;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (13,4,4,4,'Botella',null,'La botella de VIN DE CONSTANCE es una obra de arte que combina la historia y la elegancia de este vino dulce y único. El color dorado del vino resalta en el fondo blanco de la etiqueta, que muestra el nombre del vino con una letra cursiva y sofisticada. La etiqueta también lleva el logotipo de Klein Constantia, una de las bodegas más antiguas y prestigiosas de Sudáfrica, y el año de la cosecha, que indica la calidad y la longevidad de este vino. La botella tiene una forma ovalada y original, con un cuello corto y una cápsula negra que cubre el corcho.');
+commit;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc,  tipo, cantidad_caja, descripcion)
+VALUES (14,4,4,4,'Caja',6,'El color rojo intenso del vino contrasta con el fondo blanco de la etiqueta, que muestra el nombre del vino con una letra elegante y moderna. La botella tiene una forma clásica y robusta, con un cuello largo y una cápsula plateada que resguarda el corcho.');
+commit;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc, tipo, cantidad_caja, descripcion)
+VALUES (15,4,4,4,'Botella',null,'La botella del vino ANWILKA RED BLEND tiene un diseño elegante y sobrio, con una etiqueta negra que resalta el nombre del vino en letras blancas y doradas. La etiqueta también indica el origen del vino, Sudáfrica, y las variedades de uva que lo componen: syrah, cabernet sauvignon y petit verdot. La botella tiene una forma alargada y estrecha, con un cuello largo y una cápsula de color negro');
+commit;
+
+insert into presentacion (idvino, idbodega, idregion, idpaisproduc,  tipo, cantidad_caja, descripcion) VALUES (16,4,4,4,'Botella',null,' Su botella es verde claro, un color que protege el líquido de la luz y preserva su frescura y calidad. Tiene una forma cilíndrica, con un cuello largo y estrecho, que favorece la formación y el escape de las finas burbujas que le dan vida y sabor. Su etiqueta es sobria y elegante, con el nombre del vino, Klein Constantia Brut 2023, en letras blancas sobre un fondo negro. También se puede apreciar el logotipo de la finca, una de las más antiguas y prestigiosas de Sudáfrica, que produce vinos desde 1685. El tapón es de corcho natural, el mejor material para conservar el vino y evitar su oxidación.');
+commit ;
+
+/*Insert Historico Precio*/
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(1,1,1,1,1,to_date('2023','YYYY'),20.15);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(2,1,1,1,2,to_date('2023','YYYY'),13);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(3,1,1,1,3,to_date('2023','YYYY'),19);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(4,1,1,1,4,to_date('2023','YYYY'),20);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(5,3,3,3,5,to_date('2023','YYYY'),50);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(6,3,3,3,6,to_date('2023','YYYY'),21);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(7,3,3,3,7,to_date('2023','YYYY'),32);
+COMMIT;
+
+INSERT INTO historico_precio(idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(8,3,3,3,8,to_date('2023','YYYY'),34);
+COMMIT;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio)
+VALUES(9,2,2,2,9,to_date('2023','yyyy') ,21.05);
+commit;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (10,2,2,2,10,to_date('2023','yyyy'),135.85);
+commit;
+
+insert into  historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (11,2,2,2,11,to_date('2023','yyyy'),94.53);
+commit ;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (12,2,2,2,12,to_date('2023','yyyyy'),34.4);
+commit ;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (13,4,4,4,13,to_date('2023','yyyy'),70.20);
+commit;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (14,4,4,4,14,to_date('2023','yyyy'),19527.75);
+commit ;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (15,4,4,4,15,to_date('2023','yyyy'),25);
+commit ;
+
+insert into historico_precio (idvino, idbodega, idregion, idpaisproduc, idpresentacion, año, precio) VALUES (16,4,4,4,16,to_date('2023','yyyy'),15.51);
+commit ;
+
+/*DOC*/
+INSERT INTO doc(idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES(1,1,1,'Valles Calchaquíes','La denominación de origen de Valles Calchaquíes en Argentina protege y distingue los vinos de esta región en la provincia de Salta. Destaca la variedad de uva Cabernet Sauvignon, produciendo vinos de alta calidad y carácter distintivo.');
+COMMIT;
+
+INSERT INTO doc(idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES(1,1,2,'Valles Calchaquíes','La denominación de origen de Valles Calchaquíes en Argentina protege los vinos producidos en esta región de la provincia de Salta. Destaca la variedad de uva Torrontés, considerada emblemática en Valles Calchaquíes, donde se producen vinos de alta calidad y distinción con esta uva.');
+COMMIT;
+
+INSERT INTO doc(idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES(1,1,3,'Valles Calchaquíes','La denominación de origen Valles Calchaquíes en Argentina protege y distingue los vinos de esta región en la provincia de Salta. Destaca la variedad de uva Bonarda, produciendo vinos de alta calidad y carácter distintivo. La Bonarda se adapta bien al clima y suelos de Valles Calchaquíes, dando lugar a vinos expresivos y únicos.');
+COMMIT;
+
+INSERT INTO doc(idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES(3,3,5,'Willamette Valley AVA','La denominación de origen de la región en Estados Unidos es Willamette Valley AVA, reconocida por producir vinos de alta calidad, especialmente de la variedad de uva Pinot Noir. Willamette Valley, en Oregón, cuenta con un clima fresco y húmedo que favorece el cultivo de la uva Pinot Noir. Los vinos de esta región son elogiados por su elegancia, delicadeza y expresión del terroir.');
+COMMIT;
+
+INSERT INTO doc(idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES(3,3,6,'Willamette Valley AVA','La denominación de origen de la región en Estados Unidos es Willamette Valley AVA, reconocida por producir vinos de alta calidad. Además del destacado Pinot Noir, también se cultiva la variedad de uva Riesling en esta región de Oregón. Los vinos Riesling de Willamette Valley son frescos, aromáticos y equilibrados en acidez, reflejando las condiciones favorables para el cultivo de esta variedad y su capacidad de expresar el terruño.');
+COMMIT;
+
+insert into doc (idregion, idpaisproduc, idvariedad, nombre, descripcion)
+values (2,2,12,'Nebbiolo d''Alba DOC','El Barolo es un vino tinto seco y de gran prestigio producido en la región del Piemonte, en Italia. Es reconocido como uno de los vinos más emblemáticos y apreciados de Italia. El Barolo cuenta con la Denominazione di Origine Controllata e Garantita (DOCG), la máxima clasificación de calidad para los vinos italianos.
+
+El vino de Barolo se elabora principalmente con la uva Nebbiolo, una variedad autóctona que le confiere su carácter distintivo.'),(2,2,13,'Moscato d''Asti DOCG','El Moscato d''Asti es un vino espumoso dulce producido en la región del Piemonte, Italia. Posee la clasificación de Denominazione di Origine Controllata e Garantita (DOCG), que es la máxima categoría de calidad para los vinos italianos. Este vino se elabora principalmente con la uva Moscato Bianco, conocida por su distintivo aroma y sabor dulce.');
+commit;
+
+insert into doc (idregion, idpaisproduc, idvariedad, nombre, descripcion)
+VALUES (4,4,1,'Constantia DOC','la región vitivinícola de Constantia, que tiene el estatus de DOC desde 1973. Esta región es la más antigua y más pequeña de Sudáfrica, y se caracteriza por su suelo de granito descompuesto, su clima marítimo y su influencia de la montaña Table')
+,(4,4,4,'Constantia DOC','la región vitivinícola de Constantia, que tiene el estatus de DOC desde 1973. Esta región es la más antigua y más pequeña de Sudáfrica, y se caracteriza por su suelo de granito descompuesto, su clima marítimo y su influencia de la montaña Table')
+,(4,4,14,'Constantia DOC','la región vitivinícola de Constantia, que tiene el estatus de DOC desde 1973. Esta región es la más antigua y más pequeña de Sudáfrica, y se caracteriza por su suelo de granito descompuesto, su clima marítimo y su influencia de la montaña Table')
+,(4,4,9,'Constantia DOC','la región vitivinícola de Constantia, que tiene el estatus de DOC desde 1973. Esta región es la más antigua y más pequeña de Sudáfrica, y se caracteriza por su suelo de granito descompuesto, su clima marítimo y su influencia de la montaña Table')
+,(4,4,8,'Constantia DOC','la región vitivinícola de Constantia, que tiene el estatus de DOC desde 1973. Esta región es la más antigua y más pequeña de Sudáfrica, y se caracteriza por su suelo de granito descompuesto, su clima marítimo y su influencia de la montaña Table');
+commit;
+/*Pais importador*/
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Canadá','Am');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Japón','As');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Reino Unido','Eu');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Estados Unidos','Am');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Brasil','Am');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Rusia','Eu');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Luxemburgo','Eu');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('China','As');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Costa Rica','Am');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Francia','Eu');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('Alemania','Eu');
+COMMIT;
+
+INSERT INTO pais_importador(NOMBRE, CONTINENTE)
+VALUES ('España','Eu');
+COMMIT;
+
+/*Exp_Pais_Año*/
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (1, 1, 1, 1, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (1, 1, 1, 4, TO_DATE('2022', 'YYYY'), 3.456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (1, 1, 1, 3, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (2, 2, 2, 2, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (2, 2, 2, 8, TO_DATE('2022', 'YYYY'), 3.456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (2, 2, 2, 11, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (3, 3, 3, 4, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (3, 3, 3, 1, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (3, 3, 3, 2, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (4, 4, 4, 3, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (4, 4, 4, 10, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (4, 4, 4, 11, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (5, 6, 6, 12, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (5, 6, 6, 3, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (5, 6, 6, 10, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (6, 6, 6, 4, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (6, 6, 6, 3, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (6, 6, 6, 2, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (7, 9, 1, 4, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (7, 9, 1, 1, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (7, 9, 1, 5, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (8, 5, 2, 7, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (8, 5, 2, 10, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (8, 5, 2, 11, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (9, 9, 1, 4, TO_DATE('2022', 'YYYY'), 1.234);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (9, 9, 1, 1, TO_DATE('2022', 'YYYY'), 789);
+COMMIT;
+
+INSERT INTO Exp_Pais_Año (idBodega, idRegion, idPaisProduc, idPaisImp, Año, Volumen_en_hect_importado)
+VALUES (9, 9, 1, 5, TO_DATE('2022', 'YYYY'), 456);
+COMMIT;
+
+
+/*Produccion Anual Vino*/
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2019','YYYY'),1,1,1,1,500,3.75,'MB');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2022','YYYY'),2,1,1,1,200,1.5,'MB');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2020','YYYY'),3,1,1,1,200,1.5,'E');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2021','YYYY'),4,1,1,1,900,6.75,'B');
+/*eeuu*/
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2021','YYYY'),5,3,3,3,700,5.25,'B');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2023','YYYY'),6,3,3,3,2000,15,'MB');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2019','YYYY'),7,3,3,3,75,0.5625,'R');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2021','YYYY'),8,3,3,3,200,1.5,'E');
+
+/*ceretto*/
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2021','YYYY'),9,2,2,2,700,5.25,'B');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2016','YYYY'),10,2,2,2,1010,7.575,'MB');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2022','YYYY'),11,2,2,2,750,5.625,'B');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2019','YYYY'),12,2,2,2,200,1,'E');
+
+/*klein- sudafrica*/
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2020','YYYY'),13,4,4,4,700,5.25,'B');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2020','YYYY'),14,4,4,4,2000,15,'MB');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2016','YYYY'),15,4,4,4,75,0.5625,'R');
+
+INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
+VALUES(to_date('2019','YYYY'),16,4,4,4,300,2.25,'MB');
+
+/*CALIFICACION_AÑO*/
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2019', 'YYYY'), 1, 1, 1, 1, 93, 'Luis Gutiérrez');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2022', 'YYYY'), 2, 1, 1, 1, 90, 'Luis Gutiérrez');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2020', 'YYYY'), 3, 1, 1, 1, 91, 'Luis Gutiérrez');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2021', 'YYYY'),4,1 ,1, 1, 94, 'Luis Gutiérrez');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2019', 'YYYY'), 7,3 ,3 ,3 , 90, 'Erin Brooks');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2021', 'YYYY'),9,2,2,2, 89, 'Monica Larner');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2016', 'YYYY'), 10,2,2,2, 96, 'Monica Larner');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2022', 'YYYY'),11,2,2,2, 93, 'Monica Larner');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2020', 'YYYY'),13,4,4,4, 95, 'Neal Martin');
+COMMIT;
+
+INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
+VALUES
+    (to_date('2016', 'YYYY'),15, 4, 4, 4, 91, 'Neal Martin');
+COMMIT;
+/*C  O  N  C  U  R  S  O*/
+
+/*jUEZ*/
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (12345678, 'John', 'Smith', 'Crítico', to_date('15-05-1990', 'DD-MM-YYYY'), 'Michael', 'Brown');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (29828497, 'Marie', 'Dubois', 'Catador Experto', to_date('20-10-1985', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (10800808, 'Pedro', 'García', 'Enólogo', to_date('03-12-1982', 'DD-MM-YYYY'), 'Andrés', 'Rodríguez');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (12311654, 'Sophie', 'Lefèvre', 'Sommelier', to_date('10-08-1978', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (81544670, 'Hans', 'Müller', 'Crítico', to_date('25-02-1985', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (87453621, 'Isabella', 'Gómez', 'Catador Experto', to_date('12-07-1990', 'DD-MM-YYYY'), 'Ana', 'Sánchez');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (53964553, 'Liam', 'Martin', 'Enólogo', to_date('18-09-1984', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (98765432100, 'Clara', 'Ramos', 'Sommelier', to_date('28-03-1973', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (19907675, 'Luca', 'Marchetti', 'Crítico', to_date('08-11-1976', 'DD-MM-YYYY'), 'Isabella', 'Pérez');
+COMMIT;
+
+/*COMPETIDOR_CATADOR*/
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (19897264, 'Juan', 'Pérez', to_date('01-01-1990', 'DD-MM-YYYY'), 'Carlos', 'González');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (29663456, 'María', 'Gómez', to_date('10-05-1995', 'DD-MM-YYYY'), 'Isabel', 'Martínez');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (12545321, 'Pedro', 'López', to_date('20-07-1988', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (15482563, 'Ana', 'Rodríguez', to_date('15-03-1992', 'DD-MM-YYYY'), 'Sofía', 'Sánchez');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (12456957894, 'Luis', 'Hernández', to_date('27-11-1998', 'DD-MM-YYYY'), 'Miguel', 'García');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (1255648, 'Laura', 'Torres', to_date('08-09-1993', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (11457755, 'Carlos', 'Ramírez', to_date('12-06-1997', 'DD-MM-YYYY'), 'Javier', 'Gómez');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (10800818, 'Sofía', 'Vargas', to_date('04-04-1996', 'DD-MM-YYYY'), '', '');
+COMMIT;
+
+INSERT INTO Competidor_Catador (Documento_identidad, Primer_nombre, Primer_apellido, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
+VALUES (29845497, 'Diego', 'Gutiérrez', to_date('22-02-1994', 'DD-MM-YYYY'), 'Andrés', 'López');
+COMMIT;
+
+/*Organizacion*/
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (1,'Wines of Argentina','Es una entidad dedicada a la promoción y difusión de los vinos argentinos a nivel internacional. Organiza los Argentina Wine Awards, un prestigioso concurso que busca reconocer y promover la calidad y diversidad de los vinos argentinos.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (2,'Veronafiere','Es una organización italiana que se dedica a la organización de eventos relacionados con la industria vinícola. Organiza el Vinitaly International Wine Competition, un concurso que se lleva a cabo en el marco de la feria Vinitaly, una de las principales ferias de vinos en Italia y a nivel mundial.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (3,'Old Mutual','Es una compañía financiera sudafricana que patrocina y organiza el Old Mutual Trophy Wine Show, uno de los principales concursos de vinos en Sudáfrica. El concurso busca reconocer la excelencia en la producción de vinos sudafricanos y promover la industria vitivinícola del país.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (4,'San Francisco Wine School','Es una institución educativa especializada en la formación y capacitación en vinos y bebidas. Organiza el San Francisco International Wine Competition, uno de los concursos de vinos más antiguos y prestigiosos de Estados Unidos, que cuenta con un panel de jueces expertos para evaluar y premiar los vinos participantes.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (5,'Ministerio de Agricultura y Alimentación de Francia','Es el organismo gubernamental encargado de promover y regular la agricultura y la alimentación en Francia. El Concours Général Agricole de Paris es organizado por este ministerio como parte de la Feria Internacional de Agricultura de París.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (6,'Unión Española de Catadores','Es una entidad en España dedicada a la promoción y divulgación de la cultura del vino. Organiza el Concurso Internacional de Vinos Bacchus, donde se evalúan y premian los vinos presentados por bodegas de todo el mundo.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (7,'Catad''Or Wine Awards','Es una entidad chilena dedicada a la promoción y evaluación de vinos. Organiza el Catad''Or Wine Awards, uno de los concursos de vinos más prestigiosos de Chile, que busca reconocer la calidad y diversidad de los vinos chilenos y extranjeros.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (8,'Grupo Baco Multimídia','Es una empresa brasileña especializada en la promoción y divulgación de vinos y bebidas. Organiza la Grande Prova de Vinhos do Brasil, un concurso que busca destacar la calidad de los vinos brasileños y promover la industria vitivinícola del país.');
+COMMIT;
+
+INSERT INTO organizacion(idpaisproduc, nombre, descripcion)
+VALUES (9,'Tannat al Mundo','Es una entidad uruguaya dedicada a la promoción de la variedad de uva Tannat y los vinos uruguayos. Organiza el Concurso Internacional de Vinos - Tannat al Mundo, donde se evalúan y premian los vinos elaborados con la variedad Tannat de Uruguay y otros países.');
+COMMIT;
+
+/*Concurso*/
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Argentina Wine Awards','Vino','Varietal/Vertical','Nacional','Se enfoca en los vinos argentinos y cuenta con la participación de reconocidos expertos y catadores');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Vinitaly International Wine Competition','Vino','Horizontal','Internacional','Organizado por Veronafiere, se lleva a cabo durante la feria Vinitaly, una de las exposiciones más importantes de vinos en Italia. El concurso evalúa una amplia variedad de vinos italianos e internacionales.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Old Mutual Trophy Wine Show','Vino','Varietal/Vertical','Nacional','Es uno de los concursos más importantes de Sudáfrica. Atrae a expertos y se enfoca en la evaluación de los vinos sudafricanos.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('San Francisco International Wine Competition','Vino','Varietal/Vertical','Internacional','Es uno de los concursos más antiguos y respetados de Estados Unidos. Cuenta con un panel de catadores profesionales que evalúan vinos de todo el mundo.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Concours Général Agricole de Paris','Vino','Horizontal','Internacional','Es uno de los concursos más prestigiosos del país. Evalúa una amplia gama de productos agrícolas, incluidos los vinos.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Concurso Internacional de Vinos Bacchus','Catador','A ciegas','Internacional','Organizado por la Unión Española de Catadores, es un concurso reconocido internacionalmente. Reúne a expertos catadores para evaluar una amplia variedad de vinos españoles e internacionales.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Catad´Or Wine Awards','Catador','A ciegas','Internacional','Es uno de los concursos de vinos más importantes de Chile. Se centra en la evaluación de vinos chilenos, pero también incluye muestras internacionales.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Grande Prova de Vinhos do Brasil','Vino','Vertical','Nacional','Se enfoca en la evaluación de vinos brasileños y tiene como objetivo promover y reconocer la calidad de la industria vitivinícola del país.');
+COMMIT;
+
+INSERT INTO concurso(nombre, tipo_concurso, tipo_cata, alcance, caracteristicas_generales)
+VALUES ('Concurso Internacional de Vinos - Tannat al Mundo','Catador','A ciegas','Internacional','Organizado por Tannat al Mundo, se centra en la variedad de uva Tannat. Reúne a expertos y catadores internacionales para evaluar y reconocer los mejores vinos Tannat de Uruguay y otras regiones');
+COMMIT;
+
+/*Organizaciones*/
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (1,1,1);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (2,2,2);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (3,3,3);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (4,4,4);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (5,5,5);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (6,6,6);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (7,7,7);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (8,8,8);
+COMMIT;
+
+INSERT INTO organizadores(idconcurso, idpaisproduc, idorganizacion)
+VALUES (9,9,9);
+COMMIT;
+
+/*Premio*/
+
+/*Argentina*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (1,'Oro','Se otorga medalla de oro al vino más destacado de Argentina','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (1,'Plata','Se otorga medalla de plata al vino destacado de Argentina','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (1,'Bronce','Se otorga medalla de bronce al vino destacado de Argentina','Medalla',3,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (1,'Gran Oro','Premio de categoria especial','Certificado',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (1,'Mejor Vino del Año','Premio de categoria especial','Certificado',1,0);
+COMMIT;
+
+/*ITALIA*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (2,'Oro','Se otorga medalla de oro al vino sobresaliente de Italia u otras regiones.','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (2,'Plata','Se otorga medalla de plata al vino sobresaliente de Italia u otras regiones.','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (2,'Bronce','Se otorga medalla de bronce al vino sobresaliente de Italia u otras regiones.','Medalla',3,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (2,'Gran Medalla de Oro','Premio de categoria especial','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (2,'Mejor Vino del Concurso','Premio de categoria especial','Certificado',1,0);
+COMMIT;
+
+/*SUDAFRICA*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (3,'Oro','Se otorga medalla de oro al vino destacado de Sudáfrica','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (3,'Plata','Se otorga medalla de plata al vino destacado de Sudáfrica','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (3,'Bronce','Se otorga medalla de bronce al vino destacado de Sudáfrica','Medalla',3,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (3,'Trophy Awards','Premio de categoria especial para el mejor vino','Certificado',1,0);
+COMMIT;
+
+/*EEUU*/
+ INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (4,'Oro','Se otorga medalla de oro al vino sobresaliente de todo el mundo','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (4,'Plata','Se otorga medalla de plata al vino sobresaliente de todo el mundo','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (4,'Bronce','Se otorga medalla de bronce al vino sobresaliente de todo el mundo','Medalla',3,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (4,'Best in Show','Premio de categoria especial para el mejor vino del concurso','Certificado',1,0);
+COMMIT;
+
+/*FRANCIA*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (5,'Oro','Se otorga medalla de oro al vino que cumple con los estándares de calidad establecidos.','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (5,'Plata','Se otorga medalla de plata al vino que cumple con los estándares de calidad establecidos.','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (5,'Bronce','Se otorga medalla de bronce al vino que cumple con los estándares de calidad establecidos.','Medalla',3,0);
+COMMIT;
+
+/*ESPAÑA*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (6,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (6,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (6,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (6,'Gran Bacchus de Oro','Premio de categoria especial para el mejor catador de la competencia','Certificado',1,0);
+COMMIT;
+
+/*CHILE*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (7,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (7,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (7,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+COMMIT;
+
+/*BRASIL*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (8,'Oro','Se otorga medalla de oro al mejor vino brasileño en diferentes categorías','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (8,'Plata','Se otorga medalla de plata al vino muy bueno brasileño en diferentes categorías','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (8,'Bronce','Se otorga medalla de bronce al mas destacado, sin embargo no perfecto vino brasileño en diferentes categorías','Medalla',3,0);
+COMMIT;
+
+/*URUGUAY*/
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (9,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (9,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+COMMIT;
+INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
+VALUES (9,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+COMMIT;
+
+/*CALENDARIO CONCURSO*/
+-- Insert 1: Argentina Wine Awards
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (1, 1, to_date('10-03-2023','DD-MM-YYYY'), to_date('12-03-2023','DD-MM-YYYY'), '15-02-2023', 100.00, to_date('28-02-2023','DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 2: Vinitaly International Wine Competition
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (2, 2,to_date('15-04-2023','DD-MM-YYYY'), to_date('20-04-2023','DD-MM-YYYY'), to_date('31-03-2023','DD-MM-YYYY'), 150.00, to_date('05-04-2023','DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 3: Old Mutual Trophy Wine Show
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (3, 3, TO_DATE('01-06-2023', 'DD-MM-YYYY'), TO_DATE('05-06-2023', 'DD-MM-YYYY'), TO_DATE('15-05-2023', 'DD-MM-YYYY'), 120.00, TO_DATE('25-05-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 4: San Francisco International Wine Competition
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (4, 4, TO_DATE('10-07-2023', 'DD-MM-YYYY'), TO_DATE('15-07-2023', 'DD-MM-YYYY'), TO_DATE('30-06-2023', 'DD-MM-YYYY'), 175.00, TO_DATE('05-07-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 5: Concours Général Agricole de Paris
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (5, 5, TO_DATE('20-02-2023', 'DD-MM-YYYY'), TO_DATE('25-02-2023', 'DD-MM-YYYY'), TO_DATE('31-01-2023', 'DD-MM-YYYY'), 90.00, TO_DATE('15-02-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 6: Concurso Internacional de Vinos Bacchus
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (6, 6, TO_DATE('25-03-2023', 'DD-MM-YYYY'), TO_DATE('30-03-2023', 'DD-MM-YYYY'), TO_DATE('10-03-2023', 'DD-MM-YYYY'), 130.00, TO_DATE('20-03-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 7: Catad'Or Wine Awards
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (7, 7, TO_DATE('05-05-2023', 'DD-MM-YYYY'), TO_DATE('10-05-2023', 'DD-MM-YYYY'), TO_DATE('15-04-2023', 'DD-MM-YYYY'), 110.00, TO_DATE('30-04-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 8: Grande Prova de Vinhos do Brasil
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (8, 8, TO_DATE('10-09-2023', 'DD-MM-YYYY'), TO_DATE('15-09-2023', 'DD-MM-YYYY'), TO_DATE('31-08-2023', 'DD-MM-YYYY'), 160.00, TO_DATE('05-09-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+-- Insert 9: Concurso Internacional de Vinos - Tannat al Mundo
+INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (9, 9, TO_DATE('05-11-2023', 'DD-MM-YYYY'), TO_DATE('10-11-2023', 'DD-MM-YYYY'), TO_DATE('15-10-2023', 'DD-MM-YYYY'), 140.00, TO_DATE('30-10-2023', 'DD-MM-YYYY'));
+COMMIT;
+
+/*J_C*/
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (1,1,12345678);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (2,2,29828497);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (3,3,10800808);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (4,4,12311654);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (5,5,81544670);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (6,6,87453621);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (7,7,53964553);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (8,8,98765432100);
+COMMIT;
+
+INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
+VALUES (9,9,19907675);
+COMMIT;
+
+/*COSTO_MUESTRAVINO*/
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (1,1,100,150);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (2,2,150,147);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (2,2,200,129);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (3,3,150,270);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (4,4,210,150);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (5,5,160,152);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (6,6,170,179.99);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (7,7,140,150.99);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (8,8,130,150.85);
+COMMIT;
+
+INSERT INTO costo_muestravino(idcalendario, idconcurso, numero_muestras, costo)
+VALUES (9,9,120,135.95);
+COMMIT;
+
+/*INSCRIPCION*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (1,1,to_date('14-02-2023','DD-MM-YYYY'),1,1,1);
+COMMIT;
+
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (2,2,to_date('30-03-2023','DD-MM-YYYY'),2,2,2);
+COMMIT;
+
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (3,3,to_date('14-05-2023','DD-MM-YYYY'),3,3,3);
+COMMIT;
+
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (4,4,to_date('29-06-2023','DD-MM-YYYY'),4,4,4);
+COMMIT;
+/*ojo con este registro*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (5,5,to_date('30-01-2023','DD-MM-YYYY'),5,6,6);
+COMMIT;
+/*CATADOR*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
+VALUES (6,6,to_date('9-03-2023','DD-MM-YYYY'),19897264,2);
+COMMIT;
+/*CATADOR*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
+VALUES (7,7,to_date('14-04-2023','DD-MM-YYYY'),15482563,1);
+COMMIT;
+/*vino*/ /*ojo con este registro*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
+VALUES (8,8,to_date('30-08-2023','DD-MM-YYYY'),7,9,1);
+COMMIT;
+/*CATADOR*/
+INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
+VALUES (9,9,to_date('14-10-2023','DD-MM-YYYY'),10800818,3);
+COMMIT;
+
+/*MUESTRA COMPITE*/
+/*ARGENTINA*/
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (1,1,1,to_date('2019','YYYY'),1,1,1,1,2);
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (1,1,1,to_date('2022','YYYY'),2,1,1,1,1);
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (1,1,1,to_date('2020','YYYY'),3,1,1,1,3);
+/*EEUU*/
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (3,3,3,to_date('2021','YYYY'),5,3,3,3,3);
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (3,3,3,to_date('2022','YYYY'),6,3,3,3,2);
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (3,3,3,to_date('2019','YYYY'),7,3,3,3,1);
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (3,3,3,to_date('2021','YYYY'),8,3,3,3,3);
+/*ITALIA*/
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (2,2,2,to_date('2021','YYYY'),9,2,2,2,3);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (2,2,2,to_date('2016','YYYY'),10,2,2,2,1);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (2,2,2,to_date('2023','YYYY'),11,2,2,2,2);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (2,2,2,to_date('2019','YYYY'),12,2,2,2,1);
+COMMIT;
+/*SUDAFRICA*/
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (4,4,4,to_date('2020','YYYY'),13,4,4,4,3);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (4,4,4,to_date('2020','YYYY'),14,4,4,4,1);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (4,4,4,to_date('2016','YYYY'),15,4,4,4,2);
+COMMIT;
+
+INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES (4,4,4,to_date('2019','YYYY'),16,4,4,4,1);
+COMMIT;
+
+/*CONSULTAS DE REPORTE ECHAS EN JASPERSOFT STUDIO*/
+/*REPORTE DE BODEGA*/
+SELECT 
+    EXTRACT(YEAR FROM Bodega.fecha_fundacion) AS anio_fundacion,
+    Bodega.resumen_empresa,
+    Bodega.direccion,
+    Bodega.pagina_web,
+    Bodega.nombre,
+    Pais_Productor.nombre AS nombre_pais,
+    regionvinicola_do.nombre AS nombre_region,
+    STRING_AGG(CONCAT('+' || CAST(telefono.codigoint AS TEXT), ' (' || CAST(telefono.codarea AS TEXT) || ') ', CAST(telefono.numero AS TEXT)), ', ') AS telefonos_bodega,
+     CONCAT(SUM(p.total_botellas), ' Botellas')  AS totalBotellas,
+    EXTRACT(YEAR FROM p.año) AS anio_produccion
+FROM 
+    bodega,
+    Pais_Productor,
+    regionvinicola_do,
+    telefono,
+    produccion_anual_vino p
+WHERE
+    Pais_Productor.idpaisproduc = Bodega.idpaisproduc
+    AND regionvinicola_do.idregion = Bodega.idregion
+    AND telefono.idbodega = Bodega.idbodega
+    AND telefono.idregion = Bodega.idregion
+    AND telefono.idpaisproducbog = Bodega.idpaisproduc
+    AND Bodega.idbodega = p.idbodega
+    AND Bodega.idregion = p.idregion
+    AND Bodega.idpaisproduc = p.idpaisproduc
+    AND p.año = $P{Año de Produccion}
+    AND Bodega.Nombre LIKE $P{NombreBodega}
+GROUP BY
+    Bodega.fecha_fundacion,
+    Bodega.resumen_empresa,
+    Bodega.direccion,
+    Bodega.pagina_web,
+    Bodega.nombre,
+    Pais_Productor.nombre,
+    regionvinicola_do.nombre,
+   anio_produccion;
+
+
+/*REPORTE DE CATALOGO*/
+SELECT
+    CASE
+        WHEN ce.idpadreclasificacion = 2 THEN 'Vino Tinto' 
+        WHEN ce.idpadreclasificacion=1 THEN (SELECT pp.nombre FROM clasificacion_estilos h,
+        clasificacion_estilos pp WHERE h.idclasificacion=v.idclasificacion AND pp.idclasificacion=h.idpadreclasificacion)
+        ELSE ce.nombre
+    END AS Tipo_Vino,
+    v.nombre, v.cata_descripcion, v.descripcion as Elaboracion , v.maridaje,v.grado_alcohol,v.acidez,v.ph,
+    v.temperatura_en_c,v.promedio_años_consumo,pr.descripcion, pr.tipo, ce.nombre as EstiloVino, hp.precio,
+    (select  string_agg(vu.nombre_variedad,' ,')from var_vino vv, variedad_uva vu
+     where vv.idvino= v.idvino and vv.idvariedad= vu.idvariedad) as VariedadesDeUva,
+     to_char(hp.año,'YYYY') as Anada,case
+         when pa.moneda='Euro' then '€'
+         when pa.moneda='Dolar Americano' then '$'
+    end as Moneda,
+ 	 case
+        when ce.idclasificacion=1 or ce.idclasificacion=2 then 'No tiene'
+			else ce.nombre
+        end as EstiloDelVino
+
+
+FROM vino_marca v, presentacion pr, clasificacion_estilos ce, historico_precio hp, pais_productor pa, Bodega b
+WHERE v.idvino= pr.idvino
+AND v.nombre= $P{NombreP}
+AND ce.idclasificacion= v.idclasificacion
+AND v.idvino= hp.idvino
+AND hp.año= to_date('2023','YYYY')
+and v.idpaisproduc=pa.idpaisproduc
+and b.idbodega= v.idbodega
+and b.nombre=$P{Bodega};
+/*REPORTE DE PAIS PRODUCTOR*/
+SELECT
+    pp.nombre,
+    pp.descripcion_general,
+    pp.moneda,
+    concat(round(total.Total_botellas,3),' millardos de hectolitros') AS Produccion_Anual,
+    STRING_AGG(DISTINCT r.Nombre, ', ') AS Region_Denominacion,
+    STRING_AGG(DISTINCT pia.Nombre, ', ') AS Paises_Importadores,
+    CASE pp.continente
+        WHEN 'Am' THEN 'América'
+        WHEN 'Eu' THEN 'Europa'
+        WHEN 'Af' THEN 'África'
+        WHEN 'As' THEN 'Asia'
+        WHEN 'Oc' THEN 'Oceanía'
+        ELSE 'Desconocido'
+    END AS continente_descripcion,
+    CONCAT(pp.superficie_viñedo_en_hectarea, ' Hectáreas') AS SuperficieVinedo,
+    CONCAT (round((pp.superficie_viñedo_en_hectarea*100)/1300000,3),' %') AS PorcentajeMundial
+FROM
+    Pais_Productor pp,
+    (
+        SELECT
+            idPaisProduc,
+            SUM(Total_botellas)*75/10000 AS Total_botellas
+        FROM
+            Produccion_Anual_Vino
+        WHERE
+            Año = $P{AñoProduccion} 
+        GROUP BY
+            idPaisProduc
+    ) total,
+    Produccion_Anual_Vino pa,
+    RegionVinicola_Do r,
+    Exp_Pais_Año epa,
+    Pais_Importador pia
+WHERE
+    total.idPaisProduc = pp.idPaisProduc
+    AND pa.idPaisProduc = pp.idPaisProduc
+    AND r.idRegion = pa.idRegion
+    AND r.idPaisProduc = pp.idPaisProduc
+    AND epa.idPaisProduc = pp.idPaisProduc
+    AND pia.idpaisimp = epa.idPaisImp
+    AND pp.Nombre = $P{Nombre Pais} 
+    AND pa.Año = $P{AñoProduccion} 
+GROUP BY
+    pp.nombre,
+    pp.descripcion_general,
+    pp.moneda,
+    total.Total_botellas,
+    continente_descripcion,
+    PorcentajeMundial,
+    SuperficieVinedo;
+
+
+/*triggers y programas almacenados de la parte de administracion de concurso de cata*/
+
+
+
+/*CONSULTAS DE CADA REPORTE*/
+
+/*Reporte concurso*/
+
+/*Reporte competidor_catador y competidor_bodega*/
+
+/*Reporte de resultado concurso*/
