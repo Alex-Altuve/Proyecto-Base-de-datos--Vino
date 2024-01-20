@@ -311,8 +311,6 @@ create table Premio(
 
 );
 
-
-
 create table Competidor_Catador(
     Documento_identidad numeric not null ,
     Primer_nombre varchar(50) not null ,
@@ -381,11 +379,12 @@ CREATE TABLE Inscripcion(
     idConcurso INT NOT NULL,
     idInscripcion INT NOT NULL default nextval('Sec_id_Inscripcion'),
     Fecha_inscripcion DATE NOT NULL,
+    Costo_total_inscripcion numeric,
     idBodega INT,
     idRegion INT,
     idPaisProduc INT,
     Documento_identidad NUMERIC,
-    Premio_catador VARCHAR(200),
+    Premio_catador NUMERIC,
 
      Constraint FK_CalendarioConcurso_Inscripcion FOREIGN KEY(idConcurso,idCalendario) REFERENCES Calendario_Concurso(idConcurso,idCalendario),
      Constraint FK_Bodega_Inscripcion FOREIGN KEY (idBodega,idRegion,IdPaisProduc) REFERENCES Bodega(idBodega,idRegion,IdPaisProduc),
@@ -439,7 +438,26 @@ CREATE TABLE Telefono(
 
 );
 
+
+/**************************************I N D I C E S*****************************************/
+/*ADMINISTRACION DE VINOS*/
+create index clasifica on clasificacion_estilos(idpadreclasificacion,nombre);
+create index vino on vino_marca(idclasificacion,nombre);
+create index tlf on telefono(dicatador,dijuez,idorganizacion,idpaisproducorg,idbodega,idregion,idpaisproducbog);
+create index pais_produc on pais_productor(nombre,moneda,continente);
+create index bod on bodega(fecha_fundacion,nombre);
+
+/*CONCURSO DE CATA*/
+
+create index prem on premio(nombre,tipo);
+create index calendario on calendario_concurso(fecha_inicio,fecha_limite_inscripcion);
+create index costo on costo_muestravino(costo);
+create index inscrip on inscripcion(idbodega,idregion,idpaisproduc,documento_identidad);
+create index muestra on muestra_compite(idvino,idbodega,idregion,idpaisproduc);
+
 /*TRIGERS Y PROGRAMAS ALMACENADOS*/
+
+/*ADMINISTRACION DE VINO*/
 /*EL nombre debe tener el formato Vitis Vinifera + Nombre*/
 CREATE FUNCTION validar_nombre_variedad_uva() RETURNS TRIGGER AS $$
 BEGIN
@@ -452,59 +470,7 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE TRIGGER validar_nombre_variedad_uva
 BEFORE INSERT OR UPDATE ON variedad_uva
-FOR EACH ROW EXECUTE PROCEDURE validar_nombre_variedad_uva();
-
-CREATE FUNCTION validar_edad_Juez_Catador() RETURNS TRIGGER AS $$
-DECLARE
-  edad INTEGER;
-BEGIN
-  edad:=EXTRACT(YEAR FROM age(current_date, new.Fecha_nacimiento));
-  IF edad < 21 THEN
-    RAISE EXCEPTION 'No se pueden registrar personas que sean menores de 21 años como Juez o Competidor';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER validar_edad_Juez
-BEFORE INSERT ON Juez
-FOR EACH ROW EXECUTE PROCEDURE  validar_edad_Juez_Catador();
-
-CREATE TRIGGER validar_edad_Competidor_Catador
-BEFORE INSERT ON Competidor_Catador
-FOR EACH ROW EXECUTE PROCEDURE  validar_edad_Juez_Catador();
-
-CREATE FUNCTION validar_tipo_cata_concurso()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.Tipo_Concurso = 'Vino' AND NEW.Tipo_Cata = 'A ciegas' THEN
-        RAISE EXCEPTION 'No se puede seleccionar "A ciegas" como tipo de cata en un concurso de vino, este solo es válido para concursos de catadores.';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER tr_validar_tipo_cata_concurso
-BEFORE INSERT OR UPDATE ON Concurso
-FOR EACH ROW
-EXECUTE FUNCTION validar_tipo_cata_concurso();
-
-/*Funcion para validar que si el tipo (en presentacion) es botella no pueda llenar cantidad caja */
-CREATE FUNCTION Validar_tipo_presentacion() returns TRIGGER AS $$
-BEGIN
-   IF new.tipo='Botella' AND new.cantidad_caja IS NOT NULL THEN
-        RAISE EXCEPTION 'La presentacion de botella no puede llenar Cantidad_Caja pues este es valido si el tipo de presentacion es Caja';
-   ELSIF NEW.tipo = 'Caja' AND NEW.cantidad_caja IS NULL THEN
-        RAISE EXCEPTION 'La presentacion de caja debe llenar Cantidad_Caja';
-   END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE 'plpgsql';
-
-CREATE TRIGGER validar_tipo_presentacion
-BEFORE INSERT OR UPDATE ON presentacion
-FOR EACH ROW
-EXECUTE FUNCTION Validar_tipo_presentacion();
+FOR EACH ROW EXECUTE FUNCTION validar_nombre_variedad_uva();
 
 
 
@@ -559,8 +525,7 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
-
-CREATE OR REPLACE FUNCTION Validar_nuevo_precio() RETURNS TRIGGER AS $$
+CREATE FUNCTION Validar_nuevo_precio() RETURNS TRIGGER AS $$
 DECLARE
     calificacion CHAR(10);
     valor NUMERIC;
@@ -587,7 +552,7 @@ $$ LANGUAGE 'plpgsql';
 
 CREATE TRIGGER Validar_Precio_Anada
 BEFORE INSERT OR UPDATE ON historico_precio
-FOR EACH ROW EXECUTE PROCEDURE Validar_nuevo_precio();
+FOR EACH ROW EXECUTE FUNCTION Validar_nuevo_precio();
 
 
 CREATE FUNCTION Porcentaje_viñedo_mundial(Nombre_Pais varchar) returns void AS $$
@@ -605,7 +570,912 @@ CREATE FUNCTION Porcentaje_viñedo_mundial(Nombre_Pais varchar) returns void AS 
 END;
 $$ LANGUAGE 'plpgsql';
 
+/***********************************^^^^^^^^^^^^^^^^^^^^^ C O N C U R S O ^^^^^^^^^^^^^^^^^^^^^^^^^^^^************************/
+/*TRIGGER Y PROGRAMAS ALMACENADOS DE CONCURSO*/
+CREATE  FUNCTION validar_edad_Juez_Catador() RETURNS TRIGGER AS $$
+DECLARE
+  edad INTEGER;
+BEGIN
+  edad:=EXTRACT(YEAR FROM age(current_date, new.Fecha_nacimiento));
+  IF edad < 21 THEN
+    RAISE EXCEPTION 'No se pueden registrar personas que sean menores de 21 años como Juez o Competidor';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
 
+CREATE TRIGGER validar_edad_Juez
+BEFORE INSERT OR UPDATE ON Juez
+FOR EACH ROW EXECUTE FUNCTION validar_edad_Juez_Catador();
+
+CREATE TRIGGER validar_edad_Competidor_Catador
+BEFORE INSERT OR UPDATE ON Competidor_Catador
+FOR EACH ROW EXECUTE FUNCTION  validar_edad_Juez_Catador();
+
+CREATE FUNCTION validar_tipo_cata_concurso()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Tipo_Concurso = 'Vino' AND NEW.Tipo_Cata = 'A ciegas' THEN
+        RAISE EXCEPTION 'No se puede seleccionar "A ciegas" como tipo de cata en un concurso de vino, este solo es válido para concursos de catadores.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER tr_validar_tipo_cata_concurso
+BEFORE INSERT OR UPDATE ON Concurso
+FOR EACH ROW
+EXECUTE FUNCTION validar_tipo_cata_concurso();
+
+/*Funcion para validar que si el tipo (en presentacion) es botella no pueda llenar cantidad caja */
+CREATE FUNCTION Validar_tipo_presentacion() returns TRIGGER AS $$
+BEGIN
+   IF new.tipo='Botella' AND new.cantidad_caja IS NOT NULL THEN
+        RAISE EXCEPTION 'La presentacion de botella no puede llenar Cantidad_Caja pues este es valido si el tipo de presentacion es Caja';
+   ELSIF NEW.tipo = 'Caja' AND NEW.cantidad_caja IS NULL THEN
+        RAISE EXCEPTION 'La presentacion de caja debe llenar Cantidad_Caja';
+   END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_tipo_presentacion
+BEFORE INSERT OR UPDATE ON presentacion
+FOR EACH ROW
+EXECUTE FUNCTION Validar_tipo_presentacion();
+
+/*funcion para validad que cuando se registre alguien la fecha de inscripcion no puede ser despues de la fecha limite del concurso para tabla inscripcion*/
+CREATE FUNCTION validar_fecha_inscripcion() RETURNS TRIGGER AS $$
+DECLARE
+    fecha_limite date;
+BEGIN
+  select fecha_limite_inscripcion into fecha_limite from calendario_concurso as C where C.idconcurso= new.idconcurso AND C.idcalendario=NEW.idcalendario ;
+  IF new.fecha_inscripcion > fecha_limite THEN
+    RAISE EXCEPTION 'No puede inscribirse, la fecha de inscripcion no puede ser después de la fecha limite para inscribirse';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_fecha_inscripscion
+BEFORE INSERT OR UPDATE ON inscripcion
+FOR EACH ROW EXECUTE FUNCTION validar_fecha_inscripcion();
+/*funcion para validad la fecha fin y fecha inicio PARA TABLA CALENDARIO_CONCURSO*/
+
+CREATE FUNCTION validar_fechainicio_fechafin() RETURNS TRIGGER AS $$
+BEGIN
+
+  IF new.fecha_fin< new.fecha_inicio THEN
+    RAISE EXCEPTION 'La fecha de finalizacion del concurso debe ser posterior a la fecha de incio del mismo  ';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_fechainicio_fechafin_concurso
+BEFORE INSERT OR UPDATE ON calendario_concurso
+FOR EACH ROW EXECUTE FUNCTION validar_fechainicio_fechafin() ;
+
+/*Validar tipo premio y cantidad_dinero*/
+
+create function validar_tipo_cantidaddinero() returns trigger
+    language plpgsql
+as
+$$
+BEGIN
+   IF new.tipo='Efectivo' AND (new.cantidad_dinero IS NULL OR new.cantidad_dinero=0) THEN
+        RAISE EXCEPTION 'Debe indicar la cantidad de dinero que representa este premio';
+   ELSIF (NEW.tipo='Medalla' or NEW.tipo='Certificado') AND NEW.cantidad_dinero IS NOT NULL THEN
+        RAISE EXCEPTION 'Si el tipo no es efectivo la cantidad de dinero debe estar vacia, no debe llenarla';
+   END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER Validar_tipo_cantidaddinero
+BEFORE INSERT OR UPDATE ON premio
+FOR EACH ROW
+EXECUTE FUNCTION Validar_tipo_cantidaddinero();
+
+/*funcion de conversion de euro a dolares y viceversa */
+
+create function conversion_monetaria(conversion character varying, numero numeric) returns numeric
+    language plpgsql
+as
+$$
+DECLARE
+    resultado numeric;
+BEGIN
+    IF conversion ILIKE 'de' THEN
+       resultado = round(numero * 0.913804,2);
+
+    ELSIF conversion ILIKE 'ed' THEN
+       resultado  = round(numero * 1.0943269,2);
+    END IF;
+
+    RETURN resultado;
+END;
+$$;
+
+alter function conversion_monetaria(varchar, numeric) owner to postgres;
+
+/************************   NUEVOS  ********************************/
+ -- 3. Funcion para validar el registro unicamente de vinos que tengan DOC PARA TABLA MUESTRA COMPITE
+CREATE FUNCTION comprobar_variedad_en_region(id_vino numeric, id_region numeric) RETURNS boolean AS $$
+DECLARE
+  variedad_ids INTEGER[];
+  i INTEGER;
+BEGIN
+  SELECT ARRAY_AGG(var.idvariedad)
+  INTO variedad_ids
+  FROM var_vino as var
+  WHERE id_vino = var.idvino;
+
+  FOR i IN 1..array_upper(variedad_ids, 1) LOOP
+    IF NOT EXISTS ( SELECT 1 FROM doc WHERE doc.idregion = id_region AND doc.idvariedad = variedad_ids[i]) THEN
+      RETURN FALSE;
+    END IF;
+  END LOOP;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION validar_vino_doc() RETURNS TRIGGER AS $$
+declare
+    comprobar bool;
+BEGIN
+    comprobar:= comprobar_variedad_en_region(new.idvino,new.idregion);
+    if (comprobar=false) then
+        RAISE EXCEPTION 'No puede inscribirse ese vino, alguna de sus variedades de uva que lo conforman no tiene doc';
+    end if;
+    return new;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER valida_vino_doc
+    BEFORE INSERT OR UPDATE ON muestra_compite
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_vino_doc();
+
+ -- 4. Validar las bogegas participantes si el concurso es nacional unicamente de ese pais y si el concurso es internacional, puede aprticipar de cualquier pais
+
+CREATE FUNCTION ValidarBodegasP() RETURNS TRIGGER AS $$
+BEGIN
+
+    if (select c.alcance  from concurso c where idconcurso= new.idconcurso)='Nacional' then
+
+        if  (select pp.nombre from organizadores o ,pais_productor pp where o.idconcurso=new.idconcurso
+            and o.idpaisproduc= pp.idpaisproduc) != (select  p.nombre from bodega bo, pais_productor p
+            where bo.idbodega=new.idbodega and bo.idpaisproduc=p.idpaisproduc ) then
+
+                RAISE EXCEPTION 'Error la bodega que se intenta agregar no pertenece al pais donde se va a realizar el concurso';
+        end if;
+
+    end if;
+    RETURN NEW;
+
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ValidarBodegasParticipantes
+    BEFORE INSERT OR UPDATE ON inscripcion
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarBodegasP();
+
+-- 5.  Validar que si el concurso es de cata y no vinos, no se puedan inscribir los dos sino el respectivo
+
+create  function validarinscripcionbodocat() returns trigger
+    language plpgsql
+as
+$$
+BEGIN
+    if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Vino'
+           and new.documento_identidad is not null then
+        RAISE EXCEPTION 'No se pueden inscribir un catadores en un concurso donde participan Bodegas con sus respectivos vinos ';
+    end if;
+
+    if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Catador'
+        and (new.idbodega is not null or new.idregion is not null or new.idpaisproduc is not  null) then
+         RAISE EXCEPTION 'No se pueden inscribir Bodegas productoras de vino en un concurso donde participan catadores novatos';
+    end if;
+
+    if((select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Vino')
+    and (new.idbodega is  null or new.idregion is  null or  new.idpaisproduc is   null) then
+        raise exception'Se deben ingresar todos los datos de la bodega para poder realizar la inscripcion.';
+    end if;
+
+     if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Catador'
+           and new.documento_identidad is  null then
+        RAISE EXCEPTION 'Se debe indicar el documento de indentidad del participante para poder realizar la inscripcion. ';
+    end if;
+    RETURN NEW;
+END
+$$;
+
+
+CREATE TRIGGER ValidarInscripcionDeSoloBodegasOCatadores
+    BEFORE INSERT OR UPDATE  ON inscripcion
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarInscripcionBodOCat();
+
+ -- 6.Validar que la fecha limite de inscripcion no sea despues del inicio del concurso
+CREATE FUNCTION validar_fechaslimites() RETURNS TRIGGER AS $$
+BEGIN
+
+  IF new.fecha_limite_inscripcion>= new.fecha_inicio THEN
+    RAISE EXCEPTION 'La fecha limite de inscripcion del concurso debe ser antes o la misma fecha de incio del mismo  ';
+  END IF;
+  IF new.fecha_lim_envio_muestra>= new.fecha_inicio THEN
+    RAISE EXCEPTION 'La fecha limite de entrega de muestras del concurso debe ser antes o la misma fecha de incio del mismo  ';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER validar_fechaslimites
+BEFORE INSERT OR UPDATE ON calendario_concurso
+FOR EACH ROW EXECUTE FUNCTION validar_fechaslimites() ;
+--7.1 y 7.2.Validar que un catador o una bodega no se puedan inscribir dos o mas veces en un mismo concurso en la misma fecha (CASO A Y CASO B PORQUE TAMBIEN PASA CON LOS CATADORES) no se pueden repetir las instancias
+--CASO A
+
+CREATE FUNCTION validar_repetidos_inscripcion() RETURNS TRIGGER AS $$
+BEGIN
+    if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Vino' then
+        IF EXISTS (
+        SELECT 1 FROM inscripcion as i
+        WHERE i.idcalendario = NEW.idcalendario
+        AND i.idconcurso = NEW.idconcurso
+        AND i.idbodega = NEW.idbodega
+        AND i.idregion = NEW.idregion
+        AND i.idpaisproduc = NEW.idpaisproduc
+        AND i.documento_identidad is NULL
+
+        ) THEN
+        RAISE EXCEPTION 'No se permiten valores duplicados en la tabla inscripcion';
+        END IF;
+    end if;
+   if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Catador' then
+        IF EXISTS (
+        SELECT 1 FROM inscripcion as i
+        WHERE i.idcalendario = NEW.idcalendario
+        AND i.idconcurso = NEW.idconcurso
+        AND i.idbodega is null
+        AND i.idregion is null
+        AND i.idpaisproduc is null
+        AND i.documento_identidad= new.documento_identidad
+
+        ) THEN
+        RAISE EXCEPTION 'No se permiten valores duplicados en la tabla inscripcion';
+        END IF;
+    end if;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validar_repetidos_inscripcion_trigger
+BEFORE INSERT or update ON inscripcion
+FOR EACH ROW
+EXECUTE FUNCTION validar_repetidos_inscripcion();
+--CASO B
+
+CREATE FUNCTION validar_repetidos_muestra_compite() RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM muestra_compite as m
+        WHERE m.idinscripcion = NEW.idinscripcion
+        AND m.idcalendario = NEW.idcalendario
+        AND m.idconcurso = NEW.idconcurso
+        AND m.año_añada = NEW.año_añada
+        AND m.idvino = NEW.idvino
+        AND m.idbodega = NEW.idbodega
+        AND m.idregion = NEW.idregion
+        AND m.idpaisproduc = NEW.idpaisproduc
+    ) THEN
+        RAISE EXCEPTION 'No se permiten valores duplicados en la tabla muestra_compite';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validar_repetidos_muestra_compite_trigger
+BEFORE INSERT or update ON muestra_compite
+FOR EACH ROW
+EXECUTE FUNCTION validar_repetidos_muestra_compite();
+
+ -- 10.validar que en muestra compite no se puedan inscribir (registrar muestras) que sean de otras bodegas, se le modifico para que tambien validara si esa bodega existe y esta ligado a los vinos
+CREATE  FUNCTION comprobar_bodega(id_inscrip numeric, id_concur numeric,id_calen numeric) RETURNS boolean AS $$
+BEGIN
+
+    IF NOT EXISTS ( SELECT 1 FROM inscripcion as ins WHERE ins.idcalendario = id_calen AND ins.idconcurso = id_concur and ins.idinscripcion=id_inscrip) THEN
+      RETURN FALSE;
+    END IF;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE  FUNCTION comprobar_bodega_vinos_en_muestra_compite(id_inscrip numeric, id_concur numeric,id_calen numeric,id_bodega numeric,idvin numeric) RETURNS boolean AS $$
+DECLARE
+  bog integer;
+BEGIN
+  select ins.idbodega into bog from inscripcion as ins where ins.idinscripcion=id_inscrip and ins.idconcurso=id_concur and ins.idcalendario=id_calen;
+
+    IF NOT EXISTS ( SELECT 1 FROM vino_marca as vin WHERE id_bodega=bog and vin.idbodega=bog and idvin=vin.idvino) THEN
+      RETURN FALSE;
+    END IF;
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION validar_vino_bodega_muestracompite() RETURNS TRIGGER AS $$
+declare
+    comprobar bool;
+BEGIN
+    comprobar:=  comprobar_bodega(new.idinscripcion,new.idconcurso,new.idcalendario);
+    if (comprobar=false) then
+        RAISE EXCEPTION 'No puede inscribirse ese vino, porque la bodega no esta inscrita';
+    else
+        comprobar:=comprobar_bodega_vinos_en_muestra_compite(new.idinscripcion,new.idconcurso,new.idcalendario,new.idbodega,new.idvino);
+        if  (comprobar=false) then
+            RAISE EXCEPTION 'No puede inscribirse ese vino, porque no pertenece a la bodega inscrita';
+        else
+            return new;
+        end if;
+    end if;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER valida_vino_bodega_muestracompite
+    BEFORE INSERT OR UPDATE ON muestra_compite
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_vino_bodega_muestracompite();
+
+--Validar las organizaciones
+CREATE  FUNCTION validar_organizadores_concurso() RETURNS TRIGGER AS $$
+declare
+    alcance varchar;
+    comprobar integer;
+    pais varchar;
+BEGIN
+    select con.alcance into alcance from concurso as con where new.idconcurso=con.idconcurso;
+    select org.idpaisproduc into comprobar from organizadores as org where idconcurso=new.idconcurso limit 1;
+    select pais.nombre into  pais from pais_productor as pais where new.idpaisproduc=pais.idpaisproduc and comprobar=pais.idpaisproduc;
+    IF (alcance='Nacional' and comprobar is not null and pais is  null  ) then
+
+        RAISE EXCEPTION 'Esa organizacion no se puede inscribir porque no forma parte del pais el cual se esta realizando el concurso ';
+
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validar_organizadores_concurso_trigger
+BEFORE INSERT or update ON organizadores
+FOR EACH ROW
+EXECUTE FUNCTION validar_organizadores_concurso();
+
+/*------------------TRIGGER PARA LA VENTANA DE CONSUMO-------------------*/
+--2. Validar que exista el año de la añada en muestar compite y en produccion anual
+create function validar_año_añada() returns trigger
+    language plpgsql
+as
+$$
+    declare
+        tiempo integer;
+        fecha_inicio date;
+        fecha_fin date;
+        fecha_vencimiento date;
+        fecha date;
+
+
+BEGIN
+
+    IF NOT EXISTS (SELECT 1 FROM produccion_anual_vino,vino_marca WHERE
+    produccion_anual_vino.año= NEW.año_añada and
+    produccion_anual_vino.idvino=vino_marca.idvino and
+    vino_marca.idvino=new.idvino
+    ) THEN
+        RAISE EXCEPTION 'El año de la añada no existe en la tabla produccion_anual';
+    else
+       select v.promedio_años_consumo into tiempo from vino_marca as v where v.idvino=new.idvino and v.idbodega=new.idbodega and v.idregion=new.idregion and v.idpaisproduc=new.idpaisproduc;
+       SELECT cal.fecha_inicio,cal.fecha_fin into fecha_inicio,fecha_fin FROM concurso as con, calendario_concurso as cal  WHERE
+            new.idconcurso=con.idconcurso and
+            cal.idconcurso=con.idconcurso and
+            cal.idcalendario= new.idcalendario;
+        SELECT produccion_anual_vino.año into fecha FROM produccion_anual_vino,vino_marca WHERE
+    produccion_anual_vino.año= NEW.año_añada and
+    produccion_anual_vino.idvino=vino_marca.idvino and
+    vino_marca.idvino=new.idvino;
+       fecha_vencimiento:= TO_DATE(TO_CHAR((DATE_TRUNC('year', fecha) + INTERVAL '1 year' * tiempo), 'DD-MM-YYYY'), 'DD-MM-YYYY');
+       IF (fecha_vencimiento >=fecha_inicio) AND (fecha_vencimiento >= fecha_fin) THEN
+            return new;
+        ELSE
+
+            raise exception 'El vino que intenta inscribir ya ha superado su fecha de consumo ';
+        END IF;
+
+    END IF;
+END
+$$;
+
+create trigger validar_año_añada_muestracompite
+    before insert or update
+    on muestra_compite
+    for each row
+execute procedure validar_año_añada();
+
+/*----------funcion para identificar el tipo de moneda de un pais------------*/
+create function MonedaAManejarConcurso(NombreConcurso varchar) returns varchar
+language plpgsql as $$
+    declare
+        valor varchar:=(select pp.continente from organizadores org ,concurso c,pais_productor pp where c.nombre=NombreConcurso
+        and org.idconcurso=c.idconcurso and pp.idpaisproduc=org.idpaisproduc);
+begin
+    if valor is null then
+    raise exception 'Error ese concurso no existe';
+    else   if valor='Eu' then return '€';
+        else return '$';
+        end if;
+    end if;
+end
+$$;
+/*-----------fUNCION DE COSTO DE MUESTRA------------*/
+create PROCEDURE CostoTotalInscripcion (NombreConcurso varchar, NombreBodegaOPersona varchar,Fecha date)
+language plpgsql as $$
+    declare
+        IdCon integer:=(select c.idconcurso from concurso c where c.nombre=NombreConcurso);
+        IdBo integer;
+        IdCal integer:=(select cc.idcalendario from calendario_concurso cc where cc.fecha_inicio=Fecha
+        and cc.idconcurso=IdCon);
+        CostoTotal numeric(10,2);
+        Cuenta integer;
+        CostoUnitario numeric(10,2);
+        Moneda varchar:= (select * from MonedaAManejarConcurso(NombreConcurso));
+begin
+    if (select c.tipo_concurso from concurso c where c.nombre=NombreConcurso)='Catador'
+        and (select c.alcance from concurso c where c.nombre=NombreConcurso)='Nacional' then
+        CostoTotal=(select cal.costo_inscripcion from calendario_concurso cal , concurso con, inscripcion i
+        where i.documento_identidad= cast(NombreBodegaOPersona AS INTEGER) and con.nombre=NombreConcurso and cal.idconcurso=con.idconcurso and cal.fecha_inicio=Fecha and
+              I.idconcurso=IdCon and i.idconcurso=cal.idconcurso);
+        IF CostoTotal is null then raise exception 'No se encontraron coincidencias';
+        else
+        raise notice 'El costo total de inscripcion fue de % %', CostoTotal,Moneda;
+        end if;
+
+    else if (select c.tipo_concurso from concurso c where c.nombre=NombreConcurso)='Catador' then
+        CostoTotal=(select cal.costo_inscripcion from calendario_concurso cal , concurso con, inscripcion i
+        where i.documento_identidad= cast(NombreBodegaOPersona AS INTEGER) and con.nombre=NombreConcurso and cal.idconcurso=con.idconcurso and cal.fecha_inicio=Fecha and
+              I.idconcurso=IdCon and i.idconcurso=cal.idconcurso);
+        IF CostoTotal is null then raise exception 'No se encontraron coincidencias';
+        else
+        raise notice 'El costo total de inscripcion en dolares es de: % $', CostoTotal;
+        raise notice 'El costo total de inscripcion en euros  es de: % €',(select * from conversion_monetaria('de',CostoTotal));
+        end if;
+    end if;
+
+    end if;
+
+    if (select c.tipo_concurso from concurso c where c.nombre=NombreConcurso)='Vino'
+        and (select c.alcance from concurso c where c.nombre=NombreConcurso)='Nacional' then
+
+        CostoTotal=(select c.costo_inscripcion from calendario_concurso c, inscripcion i, bodega b where
+        c.idconcurso=IdCon and c.fecha_inicio=Fecha and b.nombre=NombreBodegaOPersona and i.idbodega=b.idbodega
+        and i.idconcurso=c.idconcurso);
+
+        if CostoTotal is null then
+             raise exception 'No se encontraron coincidencias';
+        else
+            IdBo=(select b.idbodega from bodega b where b.nombre=NombreBodegaOPersona);
+            Cuenta = (select count(mc.idmuestra) from muestra_compite mc where mc.idconcurso=IdCon
+            and mc.idbodega=IdBo and mc.idcalendario=IdCal);
+            CostoUnitario=(select (cmv.costo/cmv.numero_muestras)as CostoUnitario  from costo_muestravino cmv where
+            cmv.idconcurso=IdCon and cmv.idcalendario=IdCal);
+            RAISE NOTICE 'Monto de inscripcion: Costo por muestras de vino: % % + costo de inscripcion: % % = % %', Cuenta* CostoUnitario,Moneda,CostoTotal,Moneda,Cuenta* CostoUnitario+CostoTotal,Moneda;
+
+        end if;
+    else if (select c.tipo_concurso from concurso c where c.nombre=NombreConcurso)='Vino' then
+         CostoTotal=(select c.costo_inscripcion from calendario_concurso c, inscripcion i, bodega b where
+        c.idconcurso=IdCon and c.fecha_inicio=Fecha and b.nombre=NombreBodegaOPersona and i.idbodega=b.idbodega
+        and i.idconcurso=c.idconcurso);
+
+        if CostoTotal is null then
+             raise exception 'No se encontraron coincidencias';
+        else
+        IdBo=(select b.idbodega from bodega b where b.nombre=NombreBodegaOPersona);
+        Cuenta = (select count(mc.idmuestra) from muestra_compite mc where mc.idconcurso=IdCon
+        and mc.idbodega=IdBo and mc.idcalendario=IdCal);
+        CostoUnitario=(select (cmv.costo/cmv.numero_muestras)as CostoUnitario  from costo_muestravino cmv where
+        cmv.idconcurso=IdCon and cmv.idcalendario=IdCal);
+        RAISE NOTICE 'Monto de inscripcion en $: Costo por muestras de vino: % $ + costo de inscripcion: % $ = % $', Cuenta* CostoUnitario,CostoTotal,Cuenta* CostoUnitario+CostoTotal;
+        RAISE NOTICE 'Monto de inscripcion en €: Costo por muestras de vino: % € + costo de inscripcion: % € = % $', (select * from conversion_monetaria('de',Cuenta* CostoUnitario)),
+        (select * from conversion_monetaria('de',CostoTotal)),(select * from conversion_monetaria('de',Cuenta* CostoUnitario+CostoTotal));
+            end if;
+        end if;
+    end if;
+
+end
+$$;
+
+/*Trigger para validar que si el concurso es de bogeda no ponga el premio de catador*/
+CREATE FUNCTION ValidarInscripcionBodOCat_Premio() RETURNS TRIGGER AS $$
+BEGIN
+    if (select c.tipo_concurso from concurso c where c.idconcurso= new.idconcurso)='Vino'
+           and new.premio_catador is not null then
+        RAISE EXCEPTION 'No se puede asignar un premio un catador cuando el concurso es de Bodegas ';
+    end if;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ValidarInscripciondeBodegas_PremioCatador
+    BEFORE INSERT OR UPDATE  ON inscripcion
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarInscripcionBodOCat_Premio();
+
+
+/*Tigger para comprobar que la poscion que has puesto si tenga un premio asociado (es decir que el concuso de un premio para esa posicion)*/
+CREATE FUNCTION ValidarInscripcion_PremioExiste_Catador() RETURNS TRIGGER AS $$
+BEGIN
+    IF (SELECT c.tipo_concurso FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Catador'
+           AND new.premio_catador NOT IN (SELECT p.posicion FROM premio p WHERE p.idconcurso = new.idconcurso) THEN
+        RAISE EXCEPTION 'El concurso al que haces referencia no da ese premio. Por ende estas haciendo referencia a un premio que no existe ';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION ValidarInscripcion_PremioExiste_Bodega() RETURNS TRIGGER AS $$
+BEGIN
+    IF (SELECT c.tipo_concurso FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Vino'
+           AND new.premio NOT IN (SELECT p.posicion FROM premio p WHERE p.idconcurso = new.idconcurso) THEN
+        RAISE EXCEPTION 'El concurso al que haces referencia no da ese premio. Por ende estas haciendo referencia a un premio que no existe ';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER ValidarInscripciondeCatador_Premio_existente
+    BEFORE INSERT OR UPDATE  ON inscripcion
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarInscripcion_PremioExiste_Catador();
+
+CREATE TRIGGER ValidarInscripciondeBodegas_Premio_existente
+    BEFORE INSERT OR UPDATE  ON muestra_compite
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarInscripcion_PremioExiste_Bodega();
+
+/*********trigger para verificar qe se cumpla lo siguiente:
+  Cata VARIETAL: compara solo vinos de la misma variedad de uva
+  Cata VERTICAL: cata de un mismo vino de diferentes añadas
+  Cata HORIZONTAL: cata de vinos de diferentes bodegas de la misma añada y D.O.C
+  Cata VARIETAL/VERTICAL:  solo vinos de la misma variedad de uva y cata de un mismo vino de diferentes añadas
+********/
+
+CREATE FUNCTION ValidarMuestra_PorCata() RETURNS TRIGGER AS $$
+DECLARE
+  cantidad_variedad integer =  (select count(*) from var_vino vn
+                                        where vn.idvino=new.idvino and vn.idbodega=new.idbodega
+                                        and vn.idregion= new.idregion and
+                                        vn.idpaisproduc=new.idpaisproduc);
+    cantidad_vinos_inscritos integer =(SELECT count(*)
+                                            FROM Vino_Marca, Bodega, regionvinicola_do, Pais_Productor, Muestra_Compite, Concurso, calendario_concurso cc
+                                            WHERE Vino_Marca.idBodega = Bodega.idBodega
+                                              AND Bodega.idRegion = regionvinicola_do.idRegion
+                                              AND regionvinicola_do.idPaisProduc = Pais_Productor.idPaisProduc
+                                              AND Vino_Marca.idVino = Muestra_Compite.idVino
+                                              AND Muestra_Compite.idConcurso = Concurso.idConcurso
+                                              AND Muestra_Compite.idcalendario= cc.idcalendario
+                                              AND Bodega.idBodega = new.idbodega
+                                              AND Concurso.idConcurso = new.idconcurso
+                                              AND cc.idcalendario= new.idcalendario);
+    variedadd_uva integer=( SELECT  var_vino.idvariedad
+                                            FROM vino_marca , bodega, regionvinicola_do, pais_productor, concurso  con, calendario_concurso cc, var_vino, inscripcion  ins
+                                            WHERE vino_marca.idBodega = bodega.idBodega
+                                              AND bodega.idRegion = regionvinicola_do.idRegion
+                                              AND regionvinicola_do.idPaisProduc = pais_productor.idPaisProduc
+                                              AND vino_marca.idVino = var_vino.idVino
+                                              AND con.idconcurso= cc.idconcurso
+                                              AND ins.idconcurso=cc.idconcurso
+                                              AND ins.idcalendario= cc.idcalendario
+                                              AND ins.idinscripcion = new.idinscripcion
+                                              AND  ins.idbodega = new.idbodega
+                                              AND  ins.idconcurso = new.idconcurso
+                                              AND  ins.idcalendario = new.idcalendario
+                                              AND  vino_marca.idvino = new.idvino);
+
+    varietal_region integer;
+    varietal_variedaduva integer;
+    vertical_idvino integer;
+    vertical_bodega integer;
+    vertical_concurso integer;
+    vertical_calendario integer;
+
+BEGIN
+  --- esto es para conseguir los datos del vino inscrito
+    SELECT vino_marca.idregion, var_vino.idvariedad, vino_marca.idvino, vino_marca.idbodega, muestra_compite.idconcurso, muestra_compite.idcalendario
+    into varietal_region,varietal_variedaduva, vertical_idvino, vertical_bodega,  vertical_concurso, vertical_calendario
+    FROM vino_marca, bodega, regionvinicola_do, pais_productor, muestra_compite, concurso as con, calendario_concurso cc, var_vino, inscripcion as ins
+    WHERE vino_marca.idbodega = bodega.idbodega
+             AND bodega.idregion = regionvinicola_do.idregion
+             AND regionvinicola_do.idpaisproduc = pais_productor.idpaisproduc
+             AND vino_marca.idVino = muestra_compite.idVino
+             AND vino_marca.idbodega = muestra_compite.idbodega
+             AND vino_marca.idVino = var_vino.idVino
+             AND muestra_Compite.idconcurso = con.idconcurso
+             AND muestra_Compite.idcalendario = cc.idcalendario
+             AND con.idconcurso= cc.idconcurso
+             AND ins.idconcurso=cc.idconcurso
+             AND ins.idcalendario= cc.idcalendario
+             AND muestra_compite.idconcurso= ins.idconcurso
+             AND muestra_compite.idcalendario= ins.idcalendario
+             AND muestra_compite.idinscripcion=ins.idinscripcion
+             AND muestra_compite.idregion= vino_marca.idregion
+             AND muestra_compite.idpaisproduc= vino_marca.idpaisproduc
+             AND bodega.idbodega = new.idbodega
+             AND con.idconcurso = new.idconcurso
+             AND cc.idcalendario = new.idcalendario
+             LIMIT 1;
+
+    IF (SELECT c.tipo_concurso FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Vino' THEN
+        IF (SELECT c.tipo_cata FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Varietal' THEN ---Tienen que ser de distintas regiones pero misma variedad de uva
+            IF(cantidad_variedad=1 and comprobar_variedad_en_region(new.idvino, new.idregion)=true and cantidad_vinos_inscritos>0 and vertical_bodega=new.idbodega and vertical_calendario=new.idcalendario and vertical_concurso=new.idconcurso) THEN
+                 if( variedadd_uva <> varietal_variedaduva)  then
+                     RAISE EXCEPTION 'No puede registrar un vino que no sean de la misma variedad de uva de la que ya esta inscrita, teniendo en cuenta siempre que los vinos deben tener doc, NOTA: Tenga en cuenta que el tipo de cata es (Varietal)';
+               end if;
+            end if;
+        end if;
+        IF (SELECT c.tipo_cata FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Vertical' THEN --Varias añadas de un mismo vino
+            IF (new.idvino <> vertical_idvino) THEN
+                RAISE EXCEPTION 'Debes registrar (UN MISMO VINO) pero que sea de añadas diferentes, NOTA: Tenga en cuenta que el tipo de cata es (Vertical)';
+            end if;
+
+            if(cantidad_vinos_inscritos>0 and new.idvino <> vertical_idvino and vertical_bodega=new.idbodega and vertical_calendario=new.idcalendario and vertical_concurso=new.idconcurso) then
+                    RAISE EXCEPTION 'Debes registrar UN MISMO VINO pero que sea de añadas diferentes, NOTA: Tenga en cuenta que el tipo de cata es (Vertical)';
+            end if;
+        end if;
+
+            IF (SELECT c.tipo_cata FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Horizontal' THEN ---Diferentes vinos, misma añada y misma region o variedad
+                if (new.idvino = vertical_idvino) then
+                    RAISE EXCEPTION 'No puede registrar un MISMO VINO, debe registrar un vino diferente pero de la MISMA AÑADA y con DOC, Recuerde: El tipo de Cata es (Horizontal)';
+                end if;
+
+                IF(comprobar_variedad_en_region(new.idvino, new.idregion)=true and cantidad_vinos_inscritos>0 and new.idvino <> vertical_idvino and vertical_calendario=new.idcalendario and vertical_concurso=new.idconcurso) THEN
+                    if((new.idregion <> varietal_region or variedadd_uva <> varietal_variedaduva)  or new.año_añada not in (SELECT  muestra_compite.año_añada
+                         FROM vino_marca, bodega, regionvinicola_do, pais_productor, muestra_compite, Concurso as con, calendario_concurso cc, var_vino, inscripcion as ins
+                         WHERE vino_marca.idbodega = bodega.idbodega
+                                AND bodega.idregion = regionvinicola_do.idregion
+                                AND regionvinicola_do.idpaisproduc = pais_productor.idpaisproduc
+                                AND vino_marca.idVino = muestra_compite.idVino
+                                AND vino_marca.idbodega = muestra_compite.idbodega
+                                AND vino_marca.idVino = var_vino.idVino
+                                AND muestra_Compite.idConcurso = con.idConcurso
+                                AND muestra_Compite.idcalendario = cc.idcalendario
+                                AND con.idconcurso= cc.idconcurso
+                                AND ins.idconcurso=cc.idconcurso
+                                AND ins.idcalendario= cc.idcalendario
+                                AND muestra_compite.idconcurso= ins.idconcurso
+                                AND muestra_compite.idcalendario= ins.idcalendario
+                                AND muestra_compite.idinscripcion=ins.idinscripcion
+                                AND muestra_compite.idregion= vino_marca.idregion
+                                AND muestra_compite.idpaisproduc= vino_marca.idpaisproduc
+                                AND con.idconcurso = new.idconcurso
+                                AND cc.idcalendario = new.idcalendario
+                                AND ins.idinscripcion= new.idinscripcion))  then
+                         RAISE EXCEPTION 'No puede registrar un vino que no sea de la misma fecha de añada (año) de las que ya esta inscrita y además ser de la misma región o variedad, teniendo en cuenta siempre que los vinos deben tener doc, tenga en cuenta que el tipo de cata es (Horizontal)';
+                   end if;
+                end if;
+            end if;
+
+            IF (SELECT c.tipo_cata FROM concurso c WHERE c.idconcurso = new.idconcurso) = 'Varietal/Vertical' THEN ---- un mismo vino de diferentes añadas y misma variedad de uva
+               if (new.idvino <> vertical_idvino ) then
+                   RAISE EXCEPTION 'Debes registrar (UN MISMO VINO), no uno diferente, y además que sea de añadas diferentes, NOTA: Tenga en cuenta que el tipo de cata es (Varietal/Vertical)';
+               end if;
+                IF(cantidad_variedad=1 and comprobar_variedad_en_region(new.idvino, new.idregion)=true and cantidad_vinos_inscritos>0 and vertical_bodega=new.idbodega and vertical_calendario=new.idcalendario and vertical_concurso=new.idconcurso and new.idvino=vertical_idvino) THEN
+                   if(variedadd_uva <> varietal_variedaduva)  then
+                         RAISE EXCEPTION 'No puede registrar un mismo vino que no sea de una añada distinta a las ya registradas y además que no sea de la misma variedad de uva de la que ya esta registrada, tenga en cuenta que el tipo de cata es (Varietal/Vertical)';
+                   end if;
+                end if;
+            end if;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ValidarInscripcionMuestra_Cumpliendo_LaCata
+    BEFORE INSERT OR UPDATE  ON muestra_compite
+    FOR EACH ROW
+    EXECUTE FUNCTION ValidarMuestra_PorCata();
+
+
+CREATE  function ValidarInscripcionPorFechas ()
+RETURNS trigger AS $$
+    declare
+        fecha date= (select fecha_inicio from calendario_concurso where idcalendario=new.idcalendario);
+begin
+    if(new.documento_identidad is not null ) then
+        if(select sum(cc.idcalendario) from calendario_concurso cc,inscripcion i where cc.fecha_inicio=fecha
+        and cc.idcalendario !=new.idcalendario and i.idcalendario=cc.idcalendario
+        and i.documento_identidad=new.documento_identidad)is not null then
+            raise exception 'Error ya esta inscrito en un concurso para esa fecha';
+        else
+            return new;
+        end if;
+    else
+        return new;
+    end if;
+
+end;
+$$ language plpgsql;
+
+
+CREATE TRIGGER validar_Un_Concurso_PorDia
+BEFORE INSERT OR UPDATE ON inscripcion
+FOR EACH ROW EXECUTE FUNCTION ValidarInscripcionPorFechas();
+
+/*PROCESO DE INSCRIPCION */
+
+/*  Proceso de inscripcion */
+
+/* Vista para datos o procedimientos de consulta para la inscripcion*/
+
+create or replace  view Paso1_DatosParaInscripcion as
+select c.idconcurso as CodigoConcurso, c.nombre as Nombre_Concurso,
+    c.tipo_concurso, c.tipo_cata, cc.idcalendario as CodigoCalendario, cc.fecha_inicio,
+    cc.costo_inscripcion , c.Alcance,
+    case when c.Alcance='Nacional' then (select p.Nombre
+    from organizadores o, pais_productor p
+    where o.idConcurso=c.idConcurso and o.idpaisproduc=p.idpaisproduc)
+    end as Pais
+from concurso c, calendario_concurso cc
+where c.idconcurso=cc.idconcurso and cc.fecha_limite_inscripcion>current_date;
+
+create or replace view Paso1Parte2_DatosDeBodega as
+select b.idBodega as CodigoBodega, b.Nombre as NombreBodega, p.Nombre as Pais_Origen
+from Bodega b, pais_productor p
+where b.idPaisProduc=p.idPaisProduc
+order by CodigoBodega;
+
+create   view Paso3_DatosParaInscribirUnaMuestra as
+select ins.idinscripcion as CodigoInscripcion, b.nombre as NombreBodega,
+c.nombre as NombreConcurso, cc.fecha_inicio,c.tipo_cata
+from bodega b, inscripcion ins , concurso c, calendario_concurso cc
+where ins.idbodega=b.idbodega and ins.idconcurso=c.idconcurso and ins.idcalendario=cc.idcalendario
+and cc.fecha_inicio>current_date
+order by CodigoInscripcion;
+
+CREATE FUNCTION Paso4_BuscarVinosDeUnaBodega(NombreBodega varchar)
+    RETURNS TABLE (CodigoVino int, NombreVino varchar, AñadasDisponibles text)
+LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY SELECT v.idvino, v.nombre,
+    (string_agg((SELECT string_agg(CAST(año AS varchar),' - ') FROM produccion_anual_vino WHERE idvino=v.idvino), ' ' )) AS AñadasDisponibles
+                 FROM bodega b ,vino_marca v
+    WHERE b.nombre=NombreBodega AND v.idbodega=b.idbodega
+    GROUP BY v.idvino, v.nombre;
+END;
+$$;
+
+/* Procedimientos ya para insertar */
+
+create procedure Paso2_InscribirseEnUnConcursoDeBodegas(CodigoDelConcurso int,
+CodicoDelCalendario int,CodigoBodega int,FechaIns date )
+language plpgsql as $$
+declare
+    idBod int =
+(select idbodega
+from bodega
+where idBodega=CodigoBodega);
+idreg int =
+(select idregion
+from bodega
+where idBodega=CodigoBodega);
+idpais int =
+(select idpaisproduc
+from bodega
+where idBodega=CodigoBodega);
+begin
+    insert into inscripcion
+        (idcalendario, idconcurso, fecha_inscripcion,idbodega, idregion, idpaisproduc)
+    values
+        (CodicoDelCalendario, CodigoDelConcurso, FechaIns, idBod, idreg, idpais);
+
+    if found then
+        raise  notice 'Se ha inscrito con exito en el concurose %',
+    (select nombre
+    from concurso
+    where idconcurso=CodigoDelConcurso);
+end
+if;
+end;
+$$;
+
+create or replace procedure Paso2_InscribirseEnUnConcursoDeCatadores
+(CodigoDelConcurso int,
+CodicoDelCalendario int,DocumentoI int,FechaIns date)
+language plpgsql as $$
+declare
+    costo numeric :=
+(select Costo_inscripcion
+from calendario_concurso
+where idCalendario=CodicoDelCalendario);
+begin
+    insert into inscripcion
+        (idcalendario, idconcurso, fecha_inscripcion,Documento_identidad,costo_total_inscripcion )
+    values
+        (CodicoDelCalendario, CodigoDelConcurso, FechaIns, DocumentoI, costo);
+
+    if found then
+        raise  notice 'Se ha inscrito con exito en el concurose %',
+    (select nombre
+    from concurso
+    where idconcurso=CodigoDelConcurso);
+end
+if;
+end;
+$$;
+
+CREATE FUNCTION Paso6_BuscardatosParapagar(CodigoDelConcurso INT, CodicoDelCalendario INT)
+    RETURNS TABLE
+(IdCosto INT, Numero_muestras NUMERIC, precio_costo NUMERIC)
+LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    SELECT costo.idmuestravino AS IdCosto, costo.numero_muestras, costo.costo
+    FROM concurso c, calendario_concurso cc, costo_muestravino AS costo
+    WHERE c.idconcurso = cc.idconcurso
+        AND costo.idconcurso = c.idconcurso
+        AND costo.idcalendario = cc.idcalendario
+        AND c.idconcurso = CodigoDelConcurso
+        AND cc.idcalendario = CodicoDelCalendario;
+END;
+$$;
+
+create procedure Paso7_Inscribir_pago_muestras(CodigoInscripcion int , CodigoDelConcurso INT, CodicoDelCalendario INT,Idcosto int)
+language plpgsql as $$
+DECLARE
+    unitario numeric;
+        cantidad numeric;
+begin
+    select count(m.idmuestra)
+    into cantidad
+    from muestra_compite as m, inscripcion as i
+    where i.idconcurso=m.idconcurso and i.idcalendario=m.idcalendario and m.idinscripcion=CodigoInscripcion and CodigoDelConcurso=m.idconcurso and m.idcalendario=CodicoDelCalendario;
+    select (costo.costo/costo.numero_muestras)
+    into unitario
+    from calendario_concurso as c, costo_muestravino as costo
+    where c.idcalendario=CodicoDelCalendario and c.idconcurso=CodigoDelConcurso and costo.idcalendario=c.idcalendario and c.idconcurso=costo.idconcurso and costo.idmuestravino=Idcosto;
+    update inscripcion set costo_total_inscripcion=(unitario*cantidad) where CodigoInscripcion=inscripcion.idinscripcion and inscripcion.idcalendario=CodicoDelCalendario and inscripcion.idconcurso=CodigoDelConcurso;
+    if found then
+        raise  notice 'Se ha inscrito con exito';
+end
+if;
+end;
+$$;
+
+create procedure Paso5_InscribirUnaMuestra(CodigoInscripcion int , CodigoDelVino int, AñoAñada date)
+language plpgsql as $$
+    DECLARE
+    idBod int =(select idbodega from vino_marca where idvino=CodigoDelVino );
+    idreg int =(select idregion from vino_marca where idvino=CodigoDelVino);
+    idpais int =(select idpaisproduc from vino_marca where idvino=CodigoDelVino);
+    IdCon int=(select idconcurso from inscripcion where idinscripcion=CodigoInscripcion);
+    IdCal int=(select idcalendario from inscripcion where idinscripcion=CodigoInscripcion);
+begin
+    insert into muestra_compite (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+    values (CodigoInscripcion,IdCal,IdCon,AñoAñada,CodigoDelVino,idBod,idreg,idpais);
+    if found then
+        raise  notice 'Se ha inscrito con exito';
+    end if;
+end;
+$$;
+
+
+/**********************************************************I  N  S  E  R  T  S******************************************************/
+/*A D M I N I S T R A C I Ò N   D E    V I N O*/
 INSERT INTO pais_productor
     (nombre, continente, descripcion_general, superficie_viñedo_en_hectarea, moneda)
 VALUES ('Argentina',
@@ -1504,7 +2374,7 @@ INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc
 VALUES(to_date('2021','YYYY'),5,3,3,3,700,5.25,'B');
 
 INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
-VALUES(to_date('2023','YYYY'),6,3,3,3,2000,15,'MB');
+VALUES(to_date('2022','YYYY'),6,3,3,3,2000,15,'MB');
 
 INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
 VALUES(to_date('2019','YYYY'),7,3,3,3,75,0.5625,'R');
@@ -1520,7 +2390,7 @@ INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc
 VALUES(to_date('2016','YYYY'),10,2,2,2,1010,7.575,'MB');
 
 INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
-VALUES(to_date('2022','YYYY'),11,2,2,2,750,5.625,'B');
+VALUES(to_date('2023','YYYY'),11,2,2,2,750,5.625,'B');
 
 INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
 VALUES(to_date('2019','YYYY'),12,2,2,2,200,1,'E');
@@ -1537,6 +2407,58 @@ VALUES(to_date('2016','YYYY'),15,4,4,4,75,0.5625,'R');
 
 INSERT INTO produccion_anual_vino(año, idvino, idbodega, idregion, idpaisproduc, total_botellas, total_dest_exp_hect, clasificación_añadas)
 VALUES(to_date('2019','YYYY'),16,4,4,4,300,2.25,'MB');
+
+/* Nuevossss */
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2020-01-01', 1, 1, 1, 1, 2000, 15, 'B');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2022-01-01', 1, 1, 1, 1, 2000, 15, 'E');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2022-01-01', 5, 3, 3, 3, 2500, 16, 'E');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2010-01-01', 5, 3, 3, 3, 2500, 16, 'MB');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2018-01-01', 5, 3, 3, 3, 2500, 16, 'R');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2016-01-01', 12, 2, 2, 2, 2600, 17, 'MB');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2021-01-01', 13, 4, 4, 4, 4600, 20, 'E');
+COMMIT;
+
+insert into produccion_anual_vino
+    (Año, idVino, idBodega, idRegion, idPaisProduc, Total_botellas, Total_dest_exp_hect, Clasificación_añadas)
+values
+    ('2019-01-01', 5, 3, 3, 3, 2500, 16, 'MB');
+COMMIT;
+
+
 
 /*CALIFICACION_AÑO*/
 INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
@@ -1576,7 +2498,7 @@ COMMIT;
 
 INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
 VALUES
-    (to_date('2022', 'YYYY'),11,2,2,2, 93, 'Monica Larner');
+    (to_date('2023', 'YYYY'),11,2,2,2, 93, 'Monica Larner');
 COMMIT;
 
 INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, Valor, Critico)
@@ -1588,7 +2510,8 @@ INSERT INTO Calificacion_Año (Año, idVino, idBodega, idRegion, idPaisProduc, V
 VALUES
     (to_date('2016', 'YYYY'),15, 4, 4, 4, 91, 'Neal Martin');
 COMMIT;
-/*C  O  N  C  U  R  S  O*/
+
+/***************************************************C  O  N  C  U  R  S  O************************************************/
 
 /*jUEZ*/
 INSERT INTO Juez (Documento_identidad, Primer_nombre, Primer_apellido, Especialidad_resumen, Fecha_nacimiento, Segundo_nombre, Segundo_apellido)
@@ -1776,172 +2699,197 @@ VALUES (9,9,9);
 COMMIT;
 
 /*Premio*/
-
 /*Argentina*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (1,'Oro','Se otorga medalla de oro al vino más destacado de Argentina','Medalla',1,0);
+VALUES (1,'Oro','Se otorga medalla de oro al vino más destacado de Argentina','Medalla',1,NULL);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (1,'Plata','Se otorga medalla de plata al vino destacado de Argentina','Medalla',2,0);
+VALUES (1,'Plata','Se otorga medalla de plata al vino destacado de Argentina','Medalla',2,NULL);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (1,'Bronce','Se otorga medalla de bronce al vino destacado de Argentina','Medalla',3,0);
+VALUES (1,'Bronce','Se otorga medalla de bronce al vino destacado de Argentina','Medalla',3,NULL);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (1,'Gran Oro','Premio de categoria especial','Certificado',1,0);
+VALUES (1,'Gran Oro','Premio de categoria especial','Certificado',1,NULL);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (1,'Mejor Vino del Año','Premio de categoria especial','Certificado',1,0);
+VALUES (1,'Mejor Vino del Año','Premio de categoria especial','Certificado',1,NULL);
 COMMIT;
 
 /*ITALIA*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (2,'Oro','Se otorga medalla de oro al vino sobresaliente de Italia u otras regiones.','Medalla',1,0);
+VALUES (2,'Oro','Se otorga medalla de oro al vino sobresaliente de Italia u otras regiones.','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (2,'Plata','Se otorga medalla de plata al vino sobresaliente de Italia u otras regiones.','Medalla',2,0);
+VALUES (2,'Plata','Se otorga medalla de plata al vino sobresaliente de Italia u otras regiones.','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (2,'Bronce','Se otorga medalla de bronce al vino sobresaliente de Italia u otras regiones.','Medalla',3,0);
+VALUES (2,'Bronce','Se otorga medalla de bronce al vino sobresaliente de Italia u otras regiones.','Medalla',3,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (2,'Gran Medalla de Oro','Premio de categoria especial','Medalla',1,0);
+VALUES (2,'Gran Medalla de Oro','Premio de categoria especial','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (2,'Mejor Vino del Concurso','Premio de categoria especial','Certificado',1,0);
+VALUES (2,'Mejor Vino del Concurso','Premio de categoria especial','Certificado',1,null);
 COMMIT;
 
 /*SUDAFRICA*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (3,'Oro','Se otorga medalla de oro al vino destacado de Sudáfrica','Medalla',1,0);
+VALUES (3,'Oro','Se otorga medalla de oro al vino destacado de Sudáfrica','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (3,'Plata','Se otorga medalla de plata al vino destacado de Sudáfrica','Medalla',2,0);
+VALUES (3,'Plata','Se otorga medalla de plata al vino destacado de Sudáfrica','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (3,'Bronce','Se otorga medalla de bronce al vino destacado de Sudáfrica','Medalla',3,0);
+VALUES (3,'Bronce','Se otorga medalla de bronce al vino destacado de Sudáfrica','Medalla',3,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (3,'Trophy Awards','Premio de categoria especial para el mejor vino','Certificado',1,0);
+VALUES (3,'Trophy Awards','Premio de categoria especial para el mejor vino','Certificado',1,null);
 COMMIT;
 
 /*EEUU*/
  INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (4,'Oro','Se otorga medalla de oro al vino sobresaliente de todo el mundo','Medalla',1,0);
+VALUES (4,'Oro','Se otorga medalla de oro al vino sobresaliente de todo el mundo','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (4,'Plata','Se otorga medalla de plata al vino sobresaliente de todo el mundo','Medalla',2,0);
+VALUES (4,'Plata','Se otorga medalla de plata al vino sobresaliente de todo el mundo','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (4,'Bronce','Se otorga medalla de bronce al vino sobresaliente de todo el mundo','Medalla',3,0);
+VALUES (4,'Bronce','Se otorga medalla de bronce al vino sobresaliente de todo el mundo','Medalla',3,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (4,'Best in Show','Premio de categoria especial para el mejor vino del concurso','Certificado',1,0);
+VALUES (4,'Best in Show','Premio de categoria especial para el mejor vino del concurso','Certificado',1,null);
 COMMIT;
 
 /*FRANCIA*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (5,'Oro','Se otorga medalla de oro al vino que cumple con los estándares de calidad establecidos.','Medalla',1,0);
+VALUES (5,'Oro','Se otorga medalla de oro al vino que cumple con los estándares de calidad establecidos.','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (5,'Plata','Se otorga medalla de plata al vino que cumple con los estándares de calidad establecidos.','Medalla',2,0);
+VALUES (5,'Plata','Se otorga medalla de plata al vino que cumple con los estándares de calidad establecidos.','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (5,'Bronce','Se otorga medalla de bronce al vino que cumple con los estándares de calidad establecidos.','Medalla',3,0);
+VALUES (5,'Bronce','Se otorga medalla de bronce al vino que cumple con los estándares de calidad establecidos.','Medalla',3,null);
 COMMIT;
 
 /*ESPAÑA*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (6,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+VALUES (6,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (6,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+VALUES (6,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (6,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+VALUES (6,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (6,'Gran Bacchus de Oro','Premio de categoria especial para el mejor catador de la competencia','Certificado',1,0);
+VALUES (6,'Gran Bacchus de Oro','Premio de categoria especial para el mejor catador de la competencia','Certificado',1,null);
 COMMIT;
 
 /*CHILE*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (7,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+VALUES (7,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (7,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+VALUES (7,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (7,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+VALUES (7,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,null);
 COMMIT;
 
 /*BRASIL*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (8,'Oro','Se otorga medalla de oro al mejor vino brasileño en diferentes categorías','Medalla',1,0);
+VALUES (8,'Oro','Se otorga medalla de oro al mejor vino brasileño en diferentes categorías','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (8,'Plata','Se otorga medalla de plata al vino muy bueno brasileño en diferentes categorías','Medalla',2,0);
+VALUES (8,'Plata','Se otorga medalla de plata al vino muy bueno brasileño en diferentes categorías','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (8,'Bronce','Se otorga medalla de bronce al mas destacado, sin embargo no perfecto vino brasileño en diferentes categorías','Medalla',3,0);
+VALUES (8,'Bronce','Se otorga medalla de bronce al mas destacado, sin embargo no perfecto vino brasileño en diferentes categorías','Medalla',3,null);
 COMMIT;
 
 /*URUGUAY*/
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (9,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,0);
+VALUES (9,'Oro','Se otorga medalla de oro al mejor catador','Medalla',1,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (9,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,0);
+VALUES (9,'Plata','Se otorga medalla de plata al catador destacado','Medalla',2,null);
 COMMIT;
 INSERT INTO premio(IDCONCURSO, NOMBRE, DESCRIPCION, TIPO, POSICION, CANTIDAD_DINERO)
-VALUES (9,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,0);
+VALUES (9,'Bronce','Se otorga medalla de bronce al catador con desempeño alto','Medalla',3,null);
 COMMIT;
 
 /*CALENDARIO CONCURSO*/
 -- Insert 1: Argentina Wine Awards
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (1, 1, to_date('10-03-2023','DD-MM-YYYY'), to_date('12-03-2023','DD-MM-YYYY'), '15-02-2023', 100.00, to_date('28-02-2023','DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (1, to_date('10-03-2023','DD-MM-YYYY'), to_date('12-03-2023','DD-MM-YYYY'), '15-02-2023', 100.00, to_date('28-02-2023','DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 2: Vinitaly International Wine Competition
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (2, 2,to_date('15-04-2023','DD-MM-YYYY'), to_date('20-04-2023','DD-MM-YYYY'), to_date('31-03-2023','DD-MM-YYYY'), 150.00, to_date('05-04-2023','DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (2, to_date('15-04-2023','DD-MM-YYYY'), to_date('20-04-2023','DD-MM-YYYY'), to_date('31-03-2023','DD-MM-YYYY'), 150.00, to_date('05-04-2023','DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 3: Old Mutual Trophy Wine Show
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (3, 3, TO_DATE('01-06-2023', 'DD-MM-YYYY'), TO_DATE('05-06-2023', 'DD-MM-YYYY'), TO_DATE('15-05-2023', 'DD-MM-YYYY'), 120.00, TO_DATE('25-05-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (3, TO_DATE('01-06-2023', 'DD-MM-YYYY'), TO_DATE('05-06-2023', 'DD-MM-YYYY'), TO_DATE('15-05-2023', 'DD-MM-YYYY'), 120.00, TO_DATE('25-05-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 4: San Francisco International Wine Competition
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (4, 4, TO_DATE('10-07-2023', 'DD-MM-YYYY'), TO_DATE('15-07-2023', 'DD-MM-YYYY'), TO_DATE('30-06-2023', 'DD-MM-YYYY'), 175.00, TO_DATE('05-07-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (4, TO_DATE('10-07-2023', 'DD-MM-YYYY'), TO_DATE('15-07-2023', 'DD-MM-YYYY'), TO_DATE('30-06-2023', 'DD-MM-YYYY'), 175.00, TO_DATE('05-07-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 5: Concours Général Agricole de Paris
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (5, 5, TO_DATE('20-02-2023', 'DD-MM-YYYY'), TO_DATE('25-02-2023', 'DD-MM-YYYY'), TO_DATE('31-01-2023', 'DD-MM-YYYY'), 90.00, TO_DATE('15-02-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (5, TO_DATE('20-02-2023', 'DD-MM-YYYY'), TO_DATE('25-02-2023', 'DD-MM-YYYY'), TO_DATE('31-01-2023', 'DD-MM-YYYY'), 90.00, TO_DATE('15-02-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 6: Concurso Internacional de Vinos Bacchus
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (6, 6, TO_DATE('25-03-2023', 'DD-MM-YYYY'), TO_DATE('30-03-2023', 'DD-MM-YYYY'), TO_DATE('10-03-2023', 'DD-MM-YYYY'), 130.00, TO_DATE('20-03-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (6,TO_DATE('25-03-2023', 'DD-MM-YYYY'), TO_DATE('30-03-2023', 'DD-MM-YYYY'), TO_DATE('10-03-2023', 'DD-MM-YYYY'), 130.00, TO_DATE('20-03-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 7: Catad'Or Wine Awards
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (7, 7, TO_DATE('05-05-2023', 'DD-MM-YYYY'), TO_DATE('10-05-2023', 'DD-MM-YYYY'), TO_DATE('15-04-2023', 'DD-MM-YYYY'), 110.00, TO_DATE('30-04-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (7,  TO_DATE('05-05-2023', 'DD-MM-YYYY'), TO_DATE('10-05-2023', 'DD-MM-YYYY'), TO_DATE('15-04-2023', 'DD-MM-YYYY'), 110.00, TO_DATE('30-04-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 8: Grande Prova de Vinhos do Brasil
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (8, 8, TO_DATE('10-09-2023', 'DD-MM-YYYY'), TO_DATE('15-09-2023', 'DD-MM-YYYY'), TO_DATE('31-08-2023', 'DD-MM-YYYY'), 160.00, TO_DATE('05-09-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (8, TO_DATE('10-09-2023', 'DD-MM-YYYY'), TO_DATE('15-09-2023', 'DD-MM-YYYY'), TO_DATE('31-08-2023', 'DD-MM-YYYY'), 160.00, TO_DATE('05-09-2023', 'DD-MM-YYYY'));
 COMMIT;
 
 -- Insert 9: Concurso Internacional de Vinos - Tannat al Mundo
-INSERT INTO Calendario_Concurso (idConcurso, idCalendario, Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
-VALUES (9, 9, TO_DATE('05-11-2023', 'DD-MM-YYYY'), TO_DATE('10-11-2023', 'DD-MM-YYYY'), TO_DATE('15-10-2023', 'DD-MM-YYYY'), 140.00, TO_DATE('30-10-2023', 'DD-MM-YYYY'));
+INSERT INTO Calendario_Concurso (idConcurso,  Fecha_inicio, Fecha_fin, Fecha_limite_inscripcion, Costo_inscripcion, Fecha_lim_envio_muestra)
+VALUES (9, TO_DATE('05-11-2023', 'DD-MM-YYYY'), TO_DATE('10-11-2023', 'DD-MM-YYYY'), TO_DATE('15-10-2023', 'DD-MM-YYYY'), 140.00, TO_DATE('30-10-2023', 'DD-MM-YYYY'));
 COMMIT;
+
+/* Nuevas ediciones */
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion, fecha_lim_envio_muestra)
+VALUES (1,'2024-02-02','2024-02-08','2024-01-31',110,'2024-01-01');
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion, fecha_lim_envio_muestra)
+VALUES (2,'2024-04-02','2024-04-08','2024-03-31',120,'2024-01-01');
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion, fecha_lim_envio_muestra)
+VALUES (5,'2024-03-15','2024-03-25','2024-03-11',100,'2024-03-12');
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion, fecha_lim_envio_muestra)
+VALUES (3,'2024-04-01','2024-04-08','2024-03-31',200,'2024-03-31');
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion)
+VALUES (6,'2024-04-02','2024-04-08','2024-03-31',120);
+
+insert into calendario_concurso
+(idconcurso, fecha_inicio, fecha_fin, fecha_limite_inscripcion, costo_inscripcion, fecha_lim_envio_muestra)
+VALUES (4,'2024-02-12','2024-02-18','2024-02-01',130,'2024-02-01');
 
 /*J_C*/
 INSERT INTO j_c(IDCALENDARIO, IDCONCURSO, DOCUMENTO_IDENTIDAD)
@@ -2022,100 +2970,261 @@ VALUES (9,9,120,135.95);
 COMMIT;
 
 /*INSCRIPCION*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (1,1,to_date('14-02-2023','DD-MM-YYYY'),1,1,1);
+
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+VALUES
+    (1, 1, to_date('14-02-2023','DD-MM-YYYY'), 1, 1, 1, 104.5);
 COMMIT;
 
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (2,2,to_date('30-03-2023','DD-MM-YYYY'),2,2,2);
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+VALUES
+    (2, 2, to_date('30-03-2023','DD-MM-YYYY'), 2, 2, 2, 152.94);
 COMMIT;
 
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (3,3,to_date('14-05-2023','DD-MM-YYYY'),3,3,3);
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+VALUES
+    (3, 3, to_date('14-05-2023','DD-MM-YYYY'), 3, 3, 3, 127.2);
 COMMIT;
 
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (4,4,to_date('29-06-2023','DD-MM-YYYY'),4,4,4);
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+VALUES
+    (4, 4, to_date('29-06-2023','DD-MM-YYYY'), 4, 4, 4, 176.42);
 COMMIT;
-/*ojo con este registro*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (5,5,to_date('30-01-2023','DD-MM-YYYY'),5,6,6);
+
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+VALUES
+    (5, 5, to_date('30-01-2023','DD-MM-YYYY'), 5, 6, 6,90);
 COMMIT;
-/*CATADOR*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
-VALUES (6,6,to_date('9-03-2023','DD-MM-YYYY'),19897264,2);
+
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+VALUES
+    (6, 6, to_date('9-03-2023','DD-MM-YYYY'), 19897264, 2, 130);
 COMMIT;
-/*CATADOR*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
-VALUES (7,7,to_date('14-04-2023','DD-MM-YYYY'),15482563,1);
+
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+VALUES
+    (7, 7, to_date('14-04-2023','DD-MM-YYYY'), 15482563, 1, 110);
 COMMIT;
-/*vino*/ /*ojo con este registro*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc)
-VALUES (8,8,to_date('30-08-2023','DD-MM-YYYY'),7,9,1);
+
+
+INSERT INTO inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+VALUES
+    (9, 9, to_date('14-10-2023','DD-MM-YYYY'), 10800818, 3, 140);
 COMMIT;
-/*CATADOR*/
-INSERT INTO inscripcion(idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador)
-VALUES (9,9,to_date('14-10-2023','DD-MM-YYYY'),10800818,3);
+
+
+/* Insertando en concurso Vinitaly International Wine Competition*/
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+values
+    (2, 2, to_date('09-03-2023','DD-MM-YYYY'), 3, 3, 3, 151.96);
 COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+values
+    (2, 2, to_date('30-03-2023','DD-MM-YYYY'), 4, 4, 4, 151.96);
+COMMIT;
+
+/* Insertando en concurso San Francisco International Wine Competition*/
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+values
+    (4, 4, to_date('29-06-2023','DD-MM-YYYY'), 1, 1, 1, 176.42);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, idbodega, idregion, idpaisproduc,costo_total_inscripcion)
+values
+    (4, 4, to_date('28-06-2023','DD-MM-YYYY'), 2, 2, 2, 176.42);
+COMMIT;
+
+/* Insertando en concurso Concurso Internacional de Vinos Bacchus*/
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+values(6, 6, to_date('09-03-2023','DD-MM-YYYY'), 29663456, 1, 130);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+values(6, 6, to_date('10-03-2023','DD-MM-YYYY'), 12545321, 3, 130);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad,costo_total_inscripcion)
+values(6, 6, to_date('10-03-2023','DD-MM-YYYY'), 15482563, 130);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad,costo_total_inscripcion)
+values(6, 6, to_date('10-03-2023','DD-MM-YYYY'), 12456957894, 130);
+COMMIT;
+
+/* Insertando en concurso Catad´Or Wine Awards*/
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+values(7, 7, to_date('10-04-2023','DD-MM-YYYY'), 12456957894, 2, 110);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad, premio_catador,costo_total_inscripcion)
+values(7, 7, to_date('11-04-2023','DD-MM-YYYY'), 1255648, 3, 110);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad,costo_total_inscripcion)
+values(7, 7, to_date('09-04-2023','DD-MM-YYYY'), 11457755, 110);
+COMMIT;
+
+insert into inscripcion
+    (idcalendario, idconcurso, fecha_inscripcion, documento_identidad,premio_catador,costo_total_inscripcion)
+values(7, 7, to_date('08-04-2023','DD-MM-YYYY'), 10800818, 1, 110);
+COMMIT;
+
 
 /*MUESTRA COMPITE*/
 /*ARGENTINA*/
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (1,1,1,to_date('2019','YYYY'),1,1,1,1,2);
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (1,1,1,to_date('2022','YYYY'),2,1,1,1,1);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (1, 1, 1, to_date('2019','YYYY'), 1, 1, 1, 1, 2);
+COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (1,1,1,to_date('2020','YYYY'),3,1,1,1,3);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (1, 1, 1, to_date('2020','YYYY'), 1, 1, 1, 1, 1);
+COMMIT;
+
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (1, 1, 1, to_date('2022','YYYY'), 1, 1, 1, 1, 3);
+COMMIT;
+
 /*EEUU*/
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (3,3,3,to_date('2021','YYYY'),5,3,3,3,3);
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (3,3,3,to_date('2022','YYYY'),6,3,3,3,2);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (3, 3, 3, to_date('2021','YYYY'), 5, 3, 3, 3, 3);
+COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (3,3,3,to_date('2019','YYYY'),7,3,3,3,1);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (3, 3, 3, to_date('2022','YYYY'), 5, 3, 3, 3, 2);
+COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (3,3,3,to_date('2021','YYYY'),8,3,3,3,3);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (3, 3, 3, to_date('2019','YYYY'), 5, 3, 3, 3, 1);
+COMMIT;
+
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (3, 3, 3, to_date('2018','YYYY'), 5, 3, 3, 3, null);
+COMMIT;
+
+
 /*ITALIA*/
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (2,2,2,to_date('2021','YYYY'),9,2,2,2,3);
+
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (2, 2, 2, to_date('2016','YYYY'), 10, 2, 2, 2, 1);
 COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (2,2,2,to_date('2016','YYYY'),10,2,2,2,1);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (2, 2, 2, to_date('2016','YYYY'), 12, 2, 2, 2, null);
 COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (2,2,2,to_date('2023','YYYY'),11,2,2,2,2);
-COMMIT;
-
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (2,2,2,to_date('2019','YYYY'),12,2,2,2,1);
-COMMIT;
 /*SUDAFRICA*/
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (4,4,4,to_date('2020','YYYY'),13,4,4,4,3);
+
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (4, 4, 4, to_date('2020','YYYY'), 13, 4, 4, 4, 3);
 COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (4,4,4,to_date('2020','YYYY'),14,4,4,4,1);
+INSERT INTO muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+VALUES
+    (4, 4, 4, to_date('2021','YYYY'), 13, 4, 4, 4, 1);
 COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (4,4,4,to_date('2016','YYYY'),15,4,4,4,2);
+/***************************************INSERT NUEVOS**************************************************/
+
+/* Insertando en concurso Vinitaly International Wine Competition*/
+
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+values
+    (9, 2, 2, to_date('2022','YYYY'), 6, 3, 3, 3, 3);
 COMMIT;
 
-INSERT INTO muestra_compite(idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
-VALUES (4,4,4,to_date('2019','YYYY'),16,4,4,4,1);
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+values
+    (9, 2, 2, to_date('2022','YYYY'), 5, 3, 3, 3);
 COMMIT;
 
-/*CONSULTAS DE REPORTE ECHAS EN JASPERSOFT STUDIO*/
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+values
+    (10, 2, 2, to_date('2020','YYYY'), 13, 4, 4, 4);
+COMMIT;
+
+/* Insertando en concurso San Francisco International Wine Competition*/
+
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc, premio)
+values
+    (11, 4, 4, to_date('2019','YYYY'), 1, 1, 1, 1, 2);
+COMMIT;
+
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+values
+    (11, 4, 4, to_date('2022','YYYY'), 1, 1, 1, 1);
+COMMIT;
+
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+values
+    (12, 4, 4, to_date('2019','YYYY'), 12, 2, 2, 2);
+COMMIT;
+
+insert into muestra_compite
+    (idinscripcion, idcalendario, idconcurso, año_añada, idvino, idbodega, idregion, idpaisproduc)
+values
+    (12, 4, 4, to_date('2016','YYYY'), 12, 2, 2, 2);
+COMMIT;
+
+
+/*******************************************CONSULTAS DE REPORTE ECHAS EN JASPERSOFT STUDIO********************************************/
+/*******ADMINISTRACION DE VINOS*******/
+
 /*REPORTE DE BODEGA*/
-SELECT 
+
+/*SELECT
     EXTRACT(YEAR FROM Bodega.fecha_fundacion) AS anio_fundacion,
     Bodega.resumen_empresa,
     Bodega.direccion,
@@ -2126,7 +3235,7 @@ SELECT
     STRING_AGG(CONCAT('+' || CAST(telefono.codigoint AS TEXT), ' (' || CAST(telefono.codarea AS TEXT) || ') ', CAST(telefono.numero AS TEXT)), ', ') AS telefonos_bodega,
      CONCAT(SUM(p.total_botellas), ' Botellas')  AS totalBotellas,
     EXTRACT(YEAR FROM p.año) AS anio_produccion
-FROM 
+FROM
     bodega,
     Pais_Productor,
     regionvinicola_do,
@@ -2157,7 +3266,7 @@ GROUP BY
 /*REPORTE DE CATALOGO*/
 SELECT
     CASE
-        WHEN ce.idpadreclasificacion = 2 THEN 'Vino Tinto' 
+        WHEN ce.idpadreclasificacion = 2 THEN 'Vino Tinto'
         WHEN ce.idpadreclasificacion=1 THEN (SELECT pp.nombre FROM clasificacion_estilos h,
         clasificacion_estilos pp WHERE h.idclasificacion=v.idclasificacion AND pp.idclasificacion=h.idpadreclasificacion)
         ELSE ce.nombre
@@ -2212,7 +3321,7 @@ FROM
         FROM
             Produccion_Anual_Vino
         WHERE
-            Año = $P{AñoProduccion} 
+            Año = $P{AñoProduccion}
         GROUP BY
             idPaisProduc
     ) total,
@@ -2227,8 +3336,8 @@ WHERE
     AND r.idPaisProduc = pp.idPaisProduc
     AND epa.idPaisProduc = pp.idPaisProduc
     AND pia.idpaisimp = epa.idPaisImp
-    AND pp.Nombre = $P{Nombre Pais} 
-    AND pa.Año = $P{AñoProduccion} 
+    AND pp.Nombre = $P{Nombre Pais}
+    AND pa.Año = $P{AñoProduccion}
 GROUP BY
     pp.nombre,
     pp.descripcion_general,
@@ -2238,15 +3347,360 @@ GROUP BY
     PorcentajeMundial,
     SuperficieVinedo;
 
+*/
 
-/*triggers y programas almacenados de la parte de administracion de concurso de cata*/
+/***********************************************************************************************************************************/
+/****************************************************CONCURSOS DE CATA (REPORTES)**************************************************/
+
+/*REPORTE CONCURSO*/
+/*SELECT
+    con.nombre,
+    con.caracteristicas_generales,
+    con.tipo_cata,
+    Case 
+      WHEN con.tipo_concurso='Vino' then con.tipo_concurso || ' (Bodegas) '
+     WHEN con.tipo_concurso='Catador' then con.tipo_concurso || 's' 
+      END as tipoCon,
+     con.alcance,
+    /*Premio*/
+   STRING_AGG(
+    CASE
+        WHEN pre.posicion = 1 AND (pre.tipo = 'Medalla' OR pre.tipo = 'Certificado') THEN 'Primer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || pre.Descripcion
+        WHEN pre.posicion = 2 AND (pre.tipo = 'Medalla' OR pre.tipo = 'Certificado') THEN 'Segundo Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || pre.Descripcion
+        WHEN pre.posicion = 3 AND (pre.tipo = 'Medalla' OR pre.tipo = 'Certificado') THEN 'Tercer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || pre.Descripcion
+
+        WHEN pre.posicion = 1 AND pre.tipo = 'Efectivo' AND con.alcance = 'Internacional' THEN 'Primer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' ||concat('- Cantidad: ',pre.cantidad_dinero, '$' , ' o ', ROUND(conversion_monetaria('de',pre.cantidad_dinero),2), '€')
+        WHEN pre.posicion = 1 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Dolar Americano' THEN 'Primer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' ||' - Cantidad: ' || pre.cantidad_dinero ||'$'
+        WHEN pre.posicion = 1 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Euro' THEN 'Primer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' ||' - Cantidad: ' || pre.cantidad_dinero ||'€'
+
+        WHEN pre.posicion = 2 AND pre.tipo = 'Efectivo' AND con.alcance = 'Internacional'  THEN 'Segundo Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || concat('- Cantidad: ',pre.cantidad_dinero, '$' , ' o ', ROUND(conversion_monetaria('de',pre.cantidad_dinero),2), '€')
+        WHEN pre.posicion = 2 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Dolar Americano' THEN 'Segundo Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || ' - Cantidad: ' || pre.cantidad_dinero ||'$'
+        WHEN pre.posicion = 2 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Euro' THEN 'Segundo Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || ' - Cantidad: ' || pre.cantidad_dinero ||'€'
+
+        WHEN pre.posicion = 3 AND pre.tipo = 'Efectivo' AND con.alcance = 'Internacional' AND pp.moneda= 'Dolar Americano' THEN 'Tercer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || concat('- Cantidad: ',pre.cantidad_dinero, '$' , ' o ', ROUND(conversion_monetaria('de',pre.cantidad_dinero),2), '€')
+        WHEN pre.posicion = 3 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Dolar Americano' THEN 'Tercer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || ' - Cantidad: ' || pre.cantidad_dinero ||'$'
+        WHEN pre.posicion = 3 AND pre.tipo = 'Efectivo' AND con.alcance = 'Nacional' AND pp.moneda= 'Euro' THEN 'Tercer Lugar' || ' ' || pre.Nombre || ' (' || pre.tipo || ') ' || ' - Cantidad: ' || pre.cantidad_dinero ||'€'
+    END,
+   E'\n') AS premios,
+    /*calendario concurso*/
+     to_char(cc.fecha_inicio,'DD-MM-YYYY') as fechaincioCon,
+      to_char(cc.fecha_fin,'DD-MM-YYYY') as fechafinalCon,
+    /*unidad monetaria */
+     CASE
+        WHEN con.alcance = 'Internacional'  THEN concat(cc.costo_inscripcion, '$' , ' o ', ROUND(conversion_monetaria('de', cc.costo_inscripcion),2), '€')
+        WHEN con.alcance = 'Nacional' AND pp.moneda= 'Dolar Americano' THEN concat(cc.costo_inscripcion, '$')
+        WHEN con.alcance = 'Nacional' AND pp.moneda= 'Euro' THEN concat(cc.costo_inscripcion, '€')
+    END AS costoinscripcion,
+    to_char(cc.fecha_limite_inscripcion,'DD-MM-YYYY') as limiteinscripcion,
+    to_char(cc.fecha_lim_envio_muestra,'DD-MM-YYYY') as limiteenvio,
+    /*organizacion*/
+    STRING_AGG(
+    DISTINCT org.nombre || E'\n' || 'Descripción: ' || org.descripcion,
+    E'\n') AS OrganizadoresCon,
+    /*Jueces*/
+    STRING_AGG(distinct j.primer_nombre ||' '|| j.segundo_nombre||' '||j.primer_apellido ||' '|| j.segundo_apellido ||', Especialidad: '|| j.especialidad_resumen, E'\n') AS juecesConcurso
+FROM
+    concurso con,
+    calendario_concurso cc,
+    organizadores og,
+    organizacion org,
+    pais_productor pp,
+    premio pre,
+    j_c jc,
+    juez j
+WHERE
+    cc.idconcurso = con.idconcurso
+    AND og.idconcurso = con.idconcurso
+    AND org.idorganizacion = og.idorganizacion
+    AND pp.idpaisproduc = org.idpaisproduc
+    AND pre.idconcurso = con.idconcurso
+    AND jc.idconcurso = con.idconcurso
+    AND j.documento_identidad = jc.documento_identidad
+    AND con.nombre ILIKE '%'||  $P{Nombre del concurso}  ||'%'
+    AND cc.fecha_inicio =  $P{Fecha inicio del concurso} 
+    AND con.tipo_cata =  $P{Tipo de cata} 
+GROUP BY
+    con.nombre,
+    con.alcance,
+    con.caracteristicas_generales,
+    con.tipo_cata,
+    con.tipo_concurso,
+    cc.fecha_inicio,
+    cc.fecha_fin,
+    cc.costo_inscripcion,
+    cc.fecha_limite_inscripcion,
+    cc.fecha_lim_envio_muestra,
+    org.nombre,
+    org.descripcion,
+    pp.moneda;
+
+/*REPORTE LISTA DE COMPETIDORES (BODEGA- CATADOR)*/
+SELECT 
+case
+    when c.tipo_concurso = 'Vino' THEN 'Lista de Competidores del Concurso de Vino (Bodega)'
+    when c.tipo_concurso = 'Catador' THEN 'Lista de Competidores del Concurso de Catadores'
+  end as titulo,
+case
+  when c.tipo_concurso='Vino'
+      then (SELECT string_agg('Fecha de inscripción: ' || to_char(i.fecha_inscripcion,'MM-DD-YYYY    ')  || ' '|| 'Bodega: '||b.nombre || ' -  País:' || pp.nombre || E'\n' || 'Vinos Inscritos: '||concat((SELECT string_agg(vm.nombre,', ') AS DatosVinos
+            FROM muestra_compite mcp, vino_marca vm
+            WHERE   mcp.idconcurso=c.idconcurso  AND mcp.idbodega=i.idbodega AND mcp.idvino=vm.idvino )), E'\n')
+            FROM inscripcion i,bodega b, pais_productor pp
+        WHERE i.idcalendario = clc.idcalendario AND i.idbodega = b.idbodega and b.idpaisproduc=pp.idpaisproduc
+        )
+           else (select  string_agg('Fecha de inscripción: '||to_char(i.fecha_inscripcion,'MM-DD-YYYY     ') ||'  Catador: '|| cpc.primer_nombre || ' ' || cpc.primer_apellido || ' DI:' || cpc.documento_identidad, E'\n') from competidor_catador cpc , inscripcion i
+           where   i.idcalendario = clc.idcalendario and i.documento_identidad=cpc.documento_identidad)
+end as DatosParticipante
+FROM
+  concurso c, calendario_concurso clc
+WHERE
+  c.nombre  ILIKE '%'||$P{Nombre del concurso}||'%'
+  AND clc.idconcurso = c.idconcurso
+  AND clc.fecha_inicio=  $P{Fecha inicio del concurso}
+  AND c.tipo_cata =  $P{Tipo de cata} 
+GROUP BY
+   clc.idcalendario,
+  c.tipo_concurso,c.idconcurso;
+
+/*REPORTE LISTA RESULTADOS (BODEGA- CATADOR)*/
+SELECT distinct p.posicion,
+  CASE
+    WHEN con.tipo_concurso = 'Vino' THEN (
+      '#' || cast(p.posicion as text) || ' Vino: ' || vino.nombre || ' ' || to_char(mue.año_añada, 'YYYY') || ' - Bodega ' || bod.nombre || ' '
+    )
+   WHEN con.tipo_concurso = 'Catador' THEN (
+       '#' || cast(p.posicion as text) || ' ' || comp.primer_nombre || ' ' || comp.primer_apellido || ' ' || 'DOC: '||cast(comp.documento_identidad as text) || '  '
+    )
+  END AS DatosParticipante
+, ' Premio:' || (select  string_agg( premio.nombre || ' '  || '('|| premio.tipo  || ')'||' ' ||
+          CASE
+            WHEN (premio.tipo = 'Efectivo') THEN (
+                case
+                    when (con.alcance='Internacional')then concat('Cantidad: ',cast(premio.cantidad_dinero as text),'$',' - ',cast(conversion_monetaria('de',premio.cantidad_dinero) as text),'€')
+                    when (con.alcance='Nacional')then (select case
+                                                                when pais.moneda='Dolar Americano' then concat('Cantidad: ',cast(premio.cantidad_dinero as text),'$')
+                                                                when pais.moneda!='Dolar Americano' then concat('Cantidad: ',cast(conversion_monetaria('de',premio.cantidad_dinero) as text),'€')
+                                                              end from organizadores as org,organizacion as o, pais_productor as pais
+                                                        where
+                                                            o.idpaisproduc=pais.idpaisproduc and
+                                                            o.idorganizacion=org.idorganizacion and
+                                                            org.idpaisproduc=o.idpaisproduc and
+                                                            org.idconcurso=con.idconcurso
+                                                            group by
+                                                                pais.moneda
+                                                            limit 1
+                                                       )
+                end
+
+                )
+            WHEN (premio.tipo != 'Efectivo' ) THEN   ' '
+          END,' / ') from premio where
+                                    case
+                                        when con.tipo_concurso='Vino' then (premio.posicion=mue.premio)
+                                        when con.tipo_concurso='Catador' then (ins.premio_catador=premio.posicion)
+                                        end
+                                  and p.idconcurso=premio.idconcurso)
+    as premio
+FROM
+  concurso as con, calendario_concurso as cal,inscripcion as ins, bodega as bod, muestra_compite as mue, vino_marca as vino, premio as p, competidor_catador as comp
+WHERE
+  con.idconcurso = cal.idconcurso
+
+ AND con.nombre  ILIKE '%'||$P{Nombre del concurso}||'%' 
+ AND cal.fecha_inicio =  $P{Fecha inicio del concurso} 
+ AND con.tipo_cata =  $P{Tipo de cata} 
+ AND
+    case
+        when con.tipo_concurso = 'Vino' THEN (ins.idcalendario = cal.idcalendario AND
+          ins.idconcurso = cal.idconcurso AND
+          ins.documento_identidad IS NULL AND
+          ins.idbodega IS NOT NULL AND
+          ins.idbodega = bod.idbodega AND
+          ins.idbodega = mue.idbodega AND
+          ins.idconcurso = mue.idconcurso AND
+          ins.idcalendario = mue.idcalendario AND
+          mue.idbodega = vino.idbodega AND
+          mue.idvino = vino.idvino AND
+          mue.idconcurso = p.idconcurso AND
+          mue.premio = p.posicion)
+        when con.tipo_concurso='Catador' then (ins.idcalendario = cal.idcalendario AND
+          ins.idconcurso = cal.idconcurso AND
+          ins.documento_identidad IS NOT NULL AND
+          ins.idbodega IS NULL AND
+          ins.premio_catador IS NOT NULL AND
+          ins.documento_identidad = comp.documento_identidad AND
+          ins.idconcurso = p.idconcurso AND
+          ins.premio_catador = p.posicion)
+    end
+GROUP BY
+  cal.idcalendario,
+  cal.idconcurso,
+  con.tipo_concurso,
+  con.idconcurso,
+  con.alcance,
+  p.posicion,
+  ins.idconcurso,
+  ins.idcalendario,
+  ins.documento_identidad,
+  ins.idbodega,
+  bod.idbodega,
+  mue.idbodega,
+  mue.idconcurso,
+  mue.idcalendario,
+  vino.idbodega,
+  mue.idvino,
+  vino.idvino,
+  mue.premio,
+  vino.nombre,
+  mue.año_añada,
+  bod.nombre,
+  comp.primer_nombre,
+  comp.primer_apellido,
+  comp.documento_identidad,
+  p.nombre,
+  p.tipo,
+  p.cantidad_dinero,
+  p.idconcurso,
+  ins.premio_catador
+order by
+    p.posicion;
+*/
 
 
+/*******************************************************SEGURIDAD ******************************************************/
+/*CONCURSO DE CATA (PLANIFICACION)*/
+CREATE ROLE organizador_ConcursoCata with
+       nosuperuser
+       nocreatedb
+       noreplication;
+COMMIT;
 
-/*CONSULTAS DE CADA REPORTE*/
+Create user alexaltuve with encrypted password 'alex29828';
+COMMIT;
+Grant organizador_ConcursoCata to alexaltuve;
+COMMIT;
+GRANT CONNECT ON DATABASE proyecto TO alexaltuve;
+COMMIT;
 
-/*Reporte concurso*/
+grant select, insert, delete, update
+    on organizacion,organizadores ,pais_productor, concurso,
+       calendario_concurso, costo_muestravino, J_C, Juez, Premio
+    to organizador_concursocata;
+COMMIT;
 
-/*Reporte competidor_catador y competidor_bodega*/
+/*funcion usadas en consultas de reportes*/
+GRANT EXECUTE ON FUNCTION conversion_monetaria TO organizador_concursocata;
+COMMIT;
 
-/*Reporte de resultado concurso*/
+/*funcion y procedimientos*/
+GRANT EXECUTE ON PROCEDURE CostoTotalInscripcion TO  organizador_concursocata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION MonedaAManejarConcurso TO  organizador_concursocata;
+COMMIT;
+
+/*funciones usadas en triggers*/
+GRANT EXECUTE ON FUNCTION comprobar_bodega TO organizador_concursocata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION comprobar_bodega_vinos_en_muestra_compite TO organizador_concursocata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION comprobar_variedad_en_region TO organizador_concursocata;
+COMMIT;
+
+/*indices*/
+grant usage on sequence sec_id_organizacion,sec_id_paisproduc,
+ sec_id_concurso,sec_id_calendarioconcurso,
+sec_id_costomuestravino,sec_id_premio to organizador_concursocata;
+commit;
+
+/*INSCRIPCIONES DE CADA CONCURSO*/
+CREATE ROLE coordinador_inscripcionesCata with
+       nosuperuser
+       nocreatedb
+       noreplication
+       nocreaterole;
+COMMIT;
+
+Create user juanhernandez with encrypted password 'juan29466';
+COMMIT;
+Grant coordinador_inscripcionesCata to juanhernandez;
+COMMIT;
+GRANT CONNECT ON DATABASE proyecto TO juanhernandez;
+COMMIT;
+
+GRANT select, insert, delete, update on
+     concurso, inscripcion, competidor_catador, muestra_compite, calendario_concurso
+     to coordinador_inscripcionescata;
+COMMIT;
+GRANT select on Bodega, regionvinicola_do, vino_marca, doc, variedad_uva, var_vino,pais_productor
+      to coordinador_inscripcionescata;
+COMMIT;
+
+/*funcion usadas en consultas de reportes*/
+GRANT EXECUTE ON FUNCTION conversion_monetaria TO coordinador_inscripcionescata;
+COMMIT;
+/*funcion y procedimientos*/
+GRANT EXECUTE ON PROCEDURE CostoTotalInscripcion TO coordinador_inscripcionescata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION MonedaAManejarConcurso TO coordinador_inscripcionescata;
+COMMIT;
+/*funciones usadas en triggers*/
+GRANT EXECUTE ON FUNCTION comprobar_bodega TO coordinador_inscripcionescata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION comprobar_bodega_vinos_en_muestra_compite TO coordinador_inscripcionescata;
+COMMIT;
+GRANT EXECUTE ON FUNCTION comprobar_variedad_en_region TO coordinador_inscripcionescata;
+COMMIT;
+
+/*SEQUENCES PARA INSERTS*/
+grant usage on sequence sec_id_concurso, sec_id_inscripcion, sec_id_muestracompite,
+sec_id_calendarioconcurso to coordinador_inscripcionescata;
+commit;
+
+
+/* Permisos para proceso inscripcion*/
+
+grant select on Paso1_DatosParaInscripcion to juanhernandez;
+grant execute  on procedure Paso2_InscribirseEnUnConcursoDeBodegas to juanhernandez;
+grant execute  on procedure Paso2_InscribirseEnUnConcursoDeCatadores to juanhernandez;
+grant select on  Paso3_DatosParaInscribirUnaMuestra to juanhernandez;
+grant execute  on function Paso4_BuscarVinosDeUnaBodega to juanhernandez;
+grant execute  on procedure Paso2_InscribirseEnUnConcursoDeBodegas to juanhernandez;
+grant execute  on procedure Paso2_InscribirseEnUnConcursoDeCatadores to juanhernandez;
+grant execute  on procedure Paso5_InscribirUnaMuestra to juanhernandez;
+grant select on table organizadores,premio,produccion_anual_vino to juanhernandez;
+grant execute on procedure  Paso7_Inscribir_pago_muestras to juanhernandez;
+grant execute on function  Paso6_BuscardatosParapagar to juanhernandez;
+grant select on costo_muestravino to juanhernandez;
+commit;
+
+/*RESULTADOS DE CADA CONCURSO*/
+CREATE ROLE comunicador_resultadosConcurso with
+       nosuperuser
+       nocreatedb
+       noreplication
+       nocreaterole;
+COMMIT;
+
+Create user santiagopena with encrypted password 'santiago30210';
+COMMIT;
+Grant comunicador_resultadosConcurso to santiagopena;
+COMMIT;
+GRANT CONNECT ON DATABASE proyecto TO santiagopena;
+COMMIT;
+
+GRANT select ON bodega, muestra_compite, premio, inscripcion, concurso, vino_marca,
+                competidor_catador, calendario_concurso, organizadores, organizacion,
+                pais_productor
+    TO comunicador_resultadosconcurso;
+COMMIT;
+
+/*funcion usadas en consultas de reportes*/
+GRANT EXECUTE ON FUNCTION conversion_monetaria TO comunicador_resultadosconcurso;
+COMMIT;
+
+/*funcion y procedimientos*/
+GRANT EXECUTE ON PROCEDURE CostoTotalInscripcion TO comunicador_resultadosconcurso;
+COMMIT;
+GRANT EXECUTE ON FUNCTION MonedaAManejarConcurso TO comunicador_resultadosconcurso;
+COMMIT;
+
